@@ -11,4 +11,5 @@
 - Root/provider change: snapshot trust reset; mandatory dry run; first trash blocked.
 
 v0.2 automates planner, Yandex pagination/recursion, typed HTTP errors, retry, cancellation, binary
-download transport and PKCE token flow. Local executor integration begins v0.4.
+download transport and PKCE token flow. v0.3 adds strict persisted-state validation, exact snapshot
+binding and detailed mobile dry-run reports. Local executor integration begins v0.4.

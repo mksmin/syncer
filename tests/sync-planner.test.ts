@@ -133,6 +133,28 @@ describe("PullSyncPlanner", () => {
     expect(plan.operations[0]).toMatchObject({ type: "SKIP", reason: "REMOTE_ROOT_CHANGED" });
   });
 
+  it("does not reuse file snapshot after remote root change", () => {
+    const state: SyncedFileState = {
+      relativePath: "A.md",
+      remoteSize: 10,
+      remoteModifiedAt: 100,
+      remoteRevision: "r1",
+      localSize: 10,
+      localModifiedAt: 100,
+      syncedAt: 50,
+    };
+    const previousState = { ...emptySyncState(), files: { "A.md": state } };
+    const plan = planner().createPlan(
+      input({
+        remoteFiles: [remote("A.md")],
+        localFiles: [local("A.md")],
+        previousState,
+        remoteRootChanged: true,
+      }),
+    );
+    expect(plan.operations[0]?.type).toBe("UPDATE_LOCAL");
+  });
+
   it("requires confirmation above delete count", () => {
     const plan = planner().createPlan(
       input({

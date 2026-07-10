@@ -1,6 +1,6 @@
 {
   "name": "syncer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Pull-only remote storage mirror for Obsidian, designed for iOS.",
   "main": "main.js",
   "type": "module",

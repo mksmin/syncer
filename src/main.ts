@@ -8,12 +8,15 @@ import { YandexAuthService } from "./providers/yandex/yandex-auth-service";
 import { normalizeRemoteRoot } from "./providers/yandex/yandex-mappers";
 import { YandexDiskProvider, type RemoteFolder } from "./providers/yandex/yandex-provider";
 import { migrateSettings } from "./settings/settings-migration";
+import { LocalVaultIndex } from "./sync/local-vault-index";
 import { SyncProgressReporter } from "./sync/progress-reporter";
+import { migrateSyncPlan } from "./sync/sync-plan-storage";
 import { PullSyncPlanner } from "./sync/sync-planner";
-import { emptySyncState, migrateSyncState } from "./sync/sync-state-repository";
-import type { LocalFile, SyncPlan } from "./types/sync";
+import { emptySyncState, isSnapshotBoundTo, migrateSyncState } from "./sync/sync-state-repository";
+import type { SyncPlan } from "./types/sync";
 import type { SyncerSettings } from "./types/settings";
 import type { SyncState } from "./types/state";
+import { DryRunModal } from "./ui/dry-run-modal";
 import { SyncerSettingTab } from "./ui/settings-tab";
 import { YandexFolderPickerModal } from "./ui/yandex-folder-picker-modal";
 
@@ -119,6 +122,7 @@ export default class SyncerPlugin extends Plugin {
     const nextRoot = normalizeRemoteRoot(value);
     if (nextRoot !== normalizeRemoteRoot(this.settings.remoteRootPath)) {
       this.syncState = emptySyncState();
+      this.lastPlan = undefined;
     }
     this.settings.remoteRootPath = nextRoot;
     await this.savePluginData();
@@ -175,11 +179,7 @@ export default class SyncerPlugin extends Plugin {
         total: 0,
         message: "Анализ локального vault…",
       });
-      const localFiles = this.app.vault.getFiles().map<LocalFile>((file) => ({
-        relativePath: file.path,
-        size: file.stat.size,
-        modifiedAt: file.stat.mtime,
-      }));
+      const localFiles = new LocalVaultIndex(this.app.vault).listFiles();
 
       this.progress.report({
         stage: "planning",
@@ -190,15 +190,14 @@ export default class SyncerPlugin extends Plugin {
       const filter = new GlobPathFilter(this.settings.excludePatterns);
       const planner = new PullSyncPlanner(filter);
       const remoteRoot = normalizeRemoteRoot(this.settings.remoteRootPath);
+      const snapshotBound = isSnapshotBoundTo(this.syncState, "yandex-disk", remoteRoot);
       this.lastPlan = planner.createPlan({
         remoteFiles,
         localFiles,
         previousState: this.syncState,
         remoteIndexComplete: true,
         remoteRootExists: true,
-        remoteRootChanged:
-          this.syncState.providerType !== "yandex-disk" ||
-          this.syncState.remoteRootPath !== remoteRoot,
+        remoteRootChanged: !snapshotBound,
         deleteMissingLocalFiles: this.settings.deleteMissingLocalFiles,
         deletionSafety: this.settings.deletionSafety,
         maxFileSizeBytes: this.settings.maxFileSizeBytes,
@@ -233,14 +232,7 @@ export default class SyncerPlugin extends Plugin {
       new Notice("Предыдущего плана нет.");
       return;
     }
-    const plan = this.lastPlan;
-    const confirm = plan.deletionAssessment.confirmationRequired
-      ? "; удаления требуют подтверждения"
-      : "";
-    new Notice(
-      `Dry run: новых ${String(plan.downloadCount)}, обновить ${String(plan.updateCount)}, в корзину ${String(plan.trashCount)}, пропустить ${String(plan.skipCount)}${confirm}. Файлы не изменены.`,
-      10_000,
-    );
+    new DryRunModal(this.app, this.lastPlan).open();
   }
 
   private setRibbonRunning(running: boolean): void {
@@ -259,7 +251,7 @@ export default class SyncerPlugin extends Plugin {
       pattern === conventionalConfigPattern ? actualConfigPattern : pattern,
     );
     this.syncState = migrateSyncState(data?.syncState);
-    this.lastPlan = data?.lastPlan;
+    this.lastPlan = migrateSyncPlan(data?.lastPlan);
   }
 
   private async savePluginData(): Promise<void> {

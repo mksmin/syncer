@@ -7,14 +7,14 @@ contract/factory; models; logger/errors; mock provider; progress; pure planner; 
 architecture, research, pull-only and safe-delete ADRs. Result: desktop/iOS-loadable dry run, zero
 file changes.
 
-## v0.2.0 — read Yandex Disk (current)
+## v0.2.0 — read Yandex Disk (done)
 
 Public-client-safe OAuth PKCE flow, token storage/forget, connection check, exact root validation,
 `requestUrl()` client, typed response guards, recursive pagination, MD5/revision mapping, retry with
 jitter/Retry-After/timeout/abort, remote folder picker, HTTP mocks. Result: complete remote file
 count; no local changes.
 
-## v0.3.0 — real dry run
+## v0.3.0 — real dry run (current)
 
 Local index, filters, snapshot binding, comparator, real `SyncPlan`, dry-run modal, deletion
 thresholds and root/provider migration guard. Result: real plan, zero file changes.

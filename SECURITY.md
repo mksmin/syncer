@@ -16,7 +16,7 @@ replacing good local data, secret leakage in diagnostics.
 - logger redacts token/auth/password/secret keys and never logs file content;
 - plugin data uses Obsidian `loadData()`/`saveData()`; `data.json` ignored by Git;
 - no client secret ships in plugin. OAuth uses confirmation-code flow with PKCE S256;
-- v0.2 performs only remote GET/metadata calls and zero local file mutations;
+- v0.3 performs only remote GET/metadata calls and zero local file mutations;
 - cancellation is cooperative because Obsidian `requestUrl()` exposes no `AbortSignal`: Syncer
   ignores a late response and starts no following request.
 

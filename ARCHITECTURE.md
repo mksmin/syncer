@@ -1,7 +1,8 @@
 # Syncer architecture
 
 Syncer — pull-only зеркало: remote storage является источником истины, локальный Obsidian vault —
-читаемой копией. v0.2.0 читает реальный индекс Яндекс Диска, строит dry-run plan и ничего не меняет.
+читаемой копией. v0.3.0 читает реальные remote/local индексы, строит подробный dry-run plan и ничего
+не меняет.
 
 ## Поток данных
 
@@ -46,9 +47,11 @@ provider регистрируется без изменения planner/executor
 
 ## State
 
-`Plugin.loadData()`/`saveData()` хранят settings, `SyncState` и last result. `schemaVersion`
+`Plugin.loadData()`/`saveData()` хранят settings, `SyncState` и last result. Persisted state и plan
+проходят runtime validation; повреждённый snapshot полностью отбрасывается. `schemaVersion`
 обязателен. Snapshot привязан к provider type и remote root. Смена любого значения сбрасывает trust,
-требует dry run и блокирует удаления на первый run.
+требует dry run и блокирует удаления на первый run. Snapshot другого root не участвует даже в
+сравнении общих путей.
 
 ## Ошибки
 
