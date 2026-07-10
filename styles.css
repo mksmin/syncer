@@ -102,6 +102,20 @@
   width: 100%;
 }
 
+.syncer-operation-controls {
+  margin-bottom: var(--size-4-4);
+}
+
+.syncer-operation-note {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  margin-bottom: var(--size-4-2);
+}
+
+.syncer-operation-cancel {
+  width: 100%;
+}
+
 .syncer-dry-run-safety {
   background: var(--background-secondary);
   color: var(--text-muted);

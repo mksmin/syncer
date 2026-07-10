@@ -60,6 +60,8 @@ export default class SyncerPlugin extends Plugin {
   private snapshotSaveChain = Promise.resolve();
   private remoteIndexCache: RemoteIndexCache | undefined;
   private lastSyncFinishedAt = 0;
+  private activeModal: DryRunModal | undefined;
+  private lastSessionModal: DryRunModal | undefined;
   readonly progress = new SyncProgressReporter();
 
   override async onload(): Promise<void> {
@@ -185,6 +187,7 @@ export default class SyncerPlugin extends Plugin {
 
   cancel(): void {
     this.abortController?.abort();
+    this.activeModal?.setProgress("Останавливаем синхронизацию…");
     this.progress.report({
       stage: "cancelled",
       current: 0,
@@ -195,7 +198,7 @@ export default class SyncerPlugin extends Plugin {
 
   private async showDryRun(): Promise<void> {
     if (this.planning) {
-      new Notice(this.progress.getProgress().message);
+      this.reopenActiveOperation();
       return;
     }
 
@@ -204,6 +207,7 @@ export default class SyncerPlugin extends Plugin {
     this.abortController = controller;
     this.setRibbonRunning(true);
     const modal = new DryRunModal(this.app);
+    this.activateModal(modal, "Формируется план синхронизации…");
     modal.open();
     try {
       this.progress.report({
@@ -258,6 +262,12 @@ export default class SyncerPlugin extends Plugin {
       modal.showError(errorMessage(error));
       new Notice(error instanceof Error ? error.message : String(error));
     } finally {
+      modal.endOperation(
+        controller.signal.aborted
+          ? "Формирование плана остановлено."
+          : "Формирование плана завершено.",
+      );
+      this.releaseActiveModal(modal);
       this.planning = false;
       this.abortController = undefined;
       this.setRibbonRunning(false);
@@ -266,7 +276,7 @@ export default class SyncerPlugin extends Plugin {
 
   private async preparePullSync(requireConfirmation = true): Promise<void> {
     if (this.planning) {
-      new Notice(this.progress.getProgress().message);
+      this.reopenActiveOperation();
       return;
     }
     const modal = new DryRunModal(this.app);
@@ -294,6 +304,7 @@ export default class SyncerPlugin extends Plugin {
     const controller = new AbortController();
     this.abortController = controller;
     this.setRibbonRunning(true);
+    this.activateModal(modal, "Формируется план синхронизации…");
     try {
       const localFiles = new LocalVaultIndex(this.app.vault).listFiles();
       const remoteRoot = normalizeRemoteRoot(this.settings.remoteRootPath);
@@ -330,6 +341,12 @@ export default class SyncerPlugin extends Plugin {
       }
       return undefined;
     } finally {
+      modal.endOperation(
+        controller.signal.aborted
+          ? "Формирование плана остановлено."
+          : "Формирование плана завершено.",
+      );
+      this.releaseActiveModal(modal);
       this.planning = false;
       this.abortController = undefined;
       this.setRibbonRunning(false);
@@ -358,6 +375,8 @@ export default class SyncerPlugin extends Plugin {
     const controller = new AbortController();
     this.abortController = controller;
     this.setRibbonRunning(true);
+    this.activateModal(modal, "Синхронизация выполняется…");
+    this.lastSessionModal = modal;
     const total = downloads.length + updates.length;
     modal.setProgress("Начало синхронизации…", 0, total);
     try {
@@ -427,6 +446,10 @@ export default class SyncerPlugin extends Plugin {
       }
     } finally {
       this.lastSyncFinishedAt = Date.now();
+      modal.endOperation(
+        controller.signal.aborted ? "Синхронизация остановлена." : "Синхронизация завершена.",
+      );
+      this.releaseActiveModal(modal);
       this.planning = false;
       this.abortController = undefined;
       this.setRibbonRunning(false);
@@ -451,6 +474,14 @@ export default class SyncerPlugin extends Plugin {
   }
 
   private showLastPlan(): void {
+    if (this.activeModal !== undefined) {
+      this.reopenActiveOperation();
+      return;
+    }
+    if (this.lastSessionModal !== undefined) {
+      this.lastSessionModal.open();
+      return;
+    }
     if (this.lastPlan === undefined) {
       new Notice("Предыдущего плана нет.");
       return;
@@ -473,7 +504,7 @@ export default class SyncerPlugin extends Plugin {
     remoteRoot: string,
   ): void {
     if (this.planning) {
-      new Notice(this.progress.getProgress().message);
+      this.reopenActiveOperation();
       return;
     }
     const downloads = selection === "updates" ? [] : downloadOperations(plan);
@@ -501,6 +532,24 @@ export default class SyncerPlugin extends Plugin {
       confirmLabel,
       () => this.executePullSync(downloads, updates, remoteRoot, modal),
     ).open();
+  }
+
+  private activateModal(modal: DryRunModal, message: string): void {
+    this.activeModal = modal;
+    modal.beginOperation(message, () => this.cancel());
+  }
+
+  private releaseActiveModal(modal: DryRunModal): void {
+    if (this.activeModal === modal) this.activeModal = undefined;
+  }
+
+  private reopenActiveOperation(): void {
+    if (this.activeModal === undefined) {
+      new Notice(this.progress.getProgress().message);
+      return;
+    }
+    this.activeModal.open();
+    new Notice("Операция продолжается. Открыт текущий прогресс.");
   }
 
   private async listRemoteFiles(

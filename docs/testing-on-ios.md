@@ -26,6 +26,8 @@
     confirmation modal. A remote deletion must never remove or trash its local file in v0.5.
 14. Reopen the plan within 60 seconds. Confirm it reports use of cache, makes no new listing request
     and does not propose already completed updates. Immediate repeated write must show cooldown.
+15. Close the modal during a long sync, then run `Показать план синхронизации`. The same session
+    must reopen with current stage/progress. Stop it from the modal and confirm no next job starts.
 
 Manual matrix: current iPhone/iOS, iPadOS, macOS/Windows desktop; Wi-Fi/mobile/weak/offline;
 Obsidian foreground/background/resume. Real iPhone verification remains release blocker outside

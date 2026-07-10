@@ -17,52 +17,69 @@ export interface DryRunActions {
   updateExisting: () => void;
 }
 
+interface ProgressState {
+  message: string;
+  current?: number;
+  total?: number;
+  isError: boolean;
+}
+
+type OperationState =
+  | { mode: "preview" }
+  | { mode: "active"; message: string; onCancel: () => void }
+  | { mode: "finished"; message: string };
+
 export class DryRunModal extends Modal {
   private plan: SyncPlan | undefined;
+  private safetyEl: HTMLElement | undefined;
   private statusEl: HTMLElement | undefined;
   private progressEl: HTMLProgressElement | undefined;
+  private operationEl: HTMLElement | undefined;
   private planEl: HTMLElement | undefined;
   private actionsEl: HTMLElement | undefined;
   private resultEl: HTMLElement | undefined;
   private actions: DryRunActions | undefined;
+  private executionErrors: readonly FileExecutionError[] = [];
+  private progressState: ProgressState;
+  private operationState: OperationState = { mode: "preview" };
   private readonly sectionOpen = new Map<string, boolean>();
 
   constructor(app: App, plan?: SyncPlan) {
     super(app);
     this.plan = plan;
+    this.progressState = {
+      message: plan === undefined ? "Подготовка…" : "План готов",
+      ...(plan === undefined ? {} : { current: 1, total: 1 }),
+      isError: false,
+    };
   }
 
   override onOpen(): void {
     this.setTitle("План синхронизации");
     this.contentEl.addClass("syncer-dry-run-modal");
-    this.contentEl.createDiv({
-      cls: "syncer-dry-run-safety",
-      text: "Предпросмотр: файлы в хранилище пока не изменяются.",
-    });
+    this.safetyEl = this.contentEl.createDiv({ cls: "syncer-dry-run-safety" });
     const progress = this.contentEl.createDiv({ cls: "syncer-live-progress" });
-    this.statusEl = progress.createDiv({
-      cls: "syncer-live-progress-status",
-      text: this.plan === undefined ? "Подготовка…" : "План готов",
-    });
+    this.statusEl = progress.createDiv({ cls: "syncer-live-progress-status" });
     this.progressEl = progress.createEl("progress", { cls: "syncer-live-progress-bar" });
-    this.progressEl.max = 1;
-    this.progressEl.value = this.plan === undefined ? 0 : 1;
+    this.operationEl = this.contentEl.createDiv({ cls: "syncer-operation-controls" });
     this.actionsEl = this.contentEl.createDiv({ cls: "syncer-plan-actions" });
     this.planEl = this.contentEl.createDiv({ cls: "syncer-live-plan" });
     this.resultEl = this.contentEl.createDiv({ cls: "syncer-execution-result" });
+    this.renderOperationState();
+    this.renderProgress();
     this.renderPlan();
     this.renderActions();
+    this.renderExecutionErrors();
   }
 
   setProgress(message: string, current?: number, total?: number): void {
-    this.statusEl?.setText(message);
-    if (this.progressEl === undefined) return;
-    if (current === undefined || total === undefined || total <= 0) {
-      this.progressEl.removeAttribute("value");
-      return;
-    }
-    this.progressEl.max = total;
-    this.progressEl.value = Math.min(current, total);
+    this.progressState = {
+      message,
+      ...(current === undefined ? {} : { current }),
+      ...(total === undefined ? {} : { total }),
+      isError: false,
+    };
+    this.renderProgress();
   }
 
   updatePlan(plan: SyncPlan, complete: boolean): void {
@@ -76,35 +93,89 @@ export class DryRunModal extends Modal {
     this.renderActions();
   }
 
+  beginOperation(message: string, onCancel: () => void): void {
+    this.operationState = { mode: "active", message, onCancel };
+    this.renderOperationState();
+    this.renderActions();
+  }
+
+  endOperation(message: string): void {
+    this.operationState = { mode: "finished", message };
+    this.renderOperationState();
+    this.renderActions();
+  }
+
   showError(message: string): void {
-    this.statusEl?.setText(message);
-    this.statusEl?.addClass("is-error");
-    this.progressEl?.removeAttribute("value");
+    this.progressState = { message, isError: true };
+    this.renderProgress();
   }
 
   showExecutionErrors(errors: readonly FileExecutionError[]): void {
-    if (this.resultEl === undefined) return;
-    this.resultEl.empty();
-    if (errors.length === 0) return;
-    const details = this.resultEl.createEl("details", { cls: "syncer-plan-section is-warning" });
-    details.open = true;
-    details.createEl("summary", { text: `Ошибки: ${String(errors.length)}` });
-    const list = details.createDiv({ cls: "syncer-plan-list" });
-    for (const error of errors.slice(0, MAX_VISIBLE_OPERATIONS)) {
-      const row = list.createDiv({ cls: "syncer-plan-row" });
-      row.createDiv({ cls: "syncer-plan-path", text: error.relativePath });
-      row.createDiv({ cls: "syncer-plan-detail", text: error.message });
-    }
+    this.executionErrors = [...errors];
+    this.renderExecutionErrors();
   }
 
   override onClose(): void {
     this.contentEl.empty();
+    this.safetyEl = undefined;
     this.statusEl = undefined;
     this.progressEl = undefined;
+    this.operationEl = undefined;
     this.planEl = undefined;
     this.actionsEl = undefined;
     this.resultEl = undefined;
-    this.actions = undefined;
+  }
+
+  private renderProgress(): void {
+    if (this.statusEl === undefined || this.progressEl === undefined) return;
+    this.statusEl.setText(this.progressState.message);
+    this.statusEl.toggleClass("is-error", this.progressState.isError);
+    const { current, total } = this.progressState;
+    if (current === undefined || total === undefined || total <= 0) {
+      this.progressEl.removeAttribute("value");
+      return;
+    }
+    this.progressEl.max = total;
+    this.progressEl.value = Math.min(current, total);
+  }
+
+  private renderOperationState(): void {
+    if (this.safetyEl === undefined || this.operationEl === undefined) return;
+    this.operationEl.empty();
+    if (this.operationState.mode === "preview") {
+      this.safetyEl.setText("Предпросмотр: файлы в хранилище пока не изменяются.");
+      return;
+    }
+    this.safetyEl.setText(this.operationState.message);
+    if (this.operationState.mode === "finished") return;
+    this.operationEl.createDiv({
+      cls: "syncer-operation-note",
+      text: "Закрытие окна не остановит операцию. Откройте «План синхронизации», чтобы вернуться.",
+    });
+    const button = this.operationEl.createEl("button", {
+      cls: "syncer-operation-cancel",
+      text: "Остановить синхронизацию",
+    });
+    button.addEventListener("click", () => {
+      button.disabled = true;
+      button.setText("Останавливаем…");
+      if (this.operationState.mode === "active") this.operationState.onCancel();
+    });
+  }
+
+  private renderExecutionErrors(): void {
+    if (this.resultEl === undefined) return;
+    this.resultEl.empty();
+    if (this.executionErrors.length === 0) return;
+    const details = this.resultEl.createEl("details", { cls: "syncer-plan-section is-warning" });
+    details.open = true;
+    details.createEl("summary", { text: `Ошибки: ${String(this.executionErrors.length)}` });
+    const list = details.createDiv({ cls: "syncer-plan-list" });
+    for (const error of this.executionErrors.slice(0, MAX_VISIBLE_OPERATIONS)) {
+      const row = list.createDiv({ cls: "syncer-plan-row" });
+      row.createDiv({ cls: "syncer-plan-path", text: error.relativePath });
+      row.createDiv({ cls: "syncer-plan-detail", text: error.message });
+    }
   }
 
   private renderPlan(): void {
@@ -158,7 +229,12 @@ export class DryRunModal extends Modal {
   private renderActions(): void {
     if (this.actionsEl === undefined) return;
     this.actionsEl.empty();
-    if (this.actions === undefined || this.plan === undefined) return;
+    if (
+      this.actions === undefined ||
+      this.plan === undefined ||
+      this.operationState.mode === "active"
+    )
+      return;
     actionButton(
       this.actionsEl,
       "Синхронизировать всё",
