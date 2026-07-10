@@ -1,16 +1,21 @@
 import { Notice, Plugin, setIcon } from "obsidian";
 import { GlobPathFilter } from "./filters/path-filter";
+import { errorMessage } from "./infrastructure/errors";
 import { ConsoleLogger, type Logger } from "./infrastructure/logger";
-import { MockRemoteStorageProvider } from "./providers/mock/mock-provider";
+import { ObsidianHttpTransport } from "./infrastructure/obsidian-http-transport";
+import { YandexApiClient } from "./providers/yandex/yandex-api-client";
+import { YandexAuthService } from "./providers/yandex/yandex-auth-service";
+import { normalizeRemoteRoot } from "./providers/yandex/yandex-mappers";
+import { YandexDiskProvider, type RemoteFolder } from "./providers/yandex/yandex-provider";
 import { migrateSettings } from "./settings/settings-migration";
 import { SyncProgressReporter } from "./sync/progress-reporter";
 import { PullSyncPlanner } from "./sync/sync-planner";
 import { emptySyncState, migrateSyncState } from "./sync/sync-state-repository";
-import type { RemoteFile } from "./types/remote";
 import type { LocalFile, SyncPlan } from "./types/sync";
 import type { SyncerSettings } from "./types/settings";
 import type { SyncState } from "./types/state";
 import { SyncerSettingTab } from "./ui/settings-tab";
+import { YandexFolderPickerModal } from "./ui/yandex-folder-picker-modal";
 
 interface PluginData {
   settings: SyncerSettings;
@@ -26,11 +31,19 @@ export default class SyncerPlugin extends Plugin {
   private abortController: AbortController | undefined;
   private ribbonEl: HTMLElement | undefined;
   private logger: Logger = new ConsoleLogger("info");
+  private readonly httpTransport = new ObsidianHttpTransport();
+  private authService: YandexAuthService | undefined;
   readonly progress = new SyncProgressReporter();
 
   override async onload(): Promise<void> {
     await this.loadPluginData();
     this.logger = new ConsoleLogger(this.settings.logLevel);
+    this.authService = new YandexAuthService({
+      transport: this.httpTransport,
+      settings: () => this.settings,
+      saveSettings: () => this.saveSettings(),
+      timeoutMs: () => this.settings.requestTimeoutMs,
+    });
     this.addSettingTab(new SyncerSettingTab(this.app, this));
 
     this.ribbonEl = this.addRibbonIcon("cloud-download", "Показать dry run", () => {
@@ -60,7 +73,7 @@ export default class SyncerPlugin extends Plugin {
     this.addCommand({
       id: "check-connection",
       name: "Проверить подключение",
-      callback: () => new Notice("Яндекс Диск будет подключён в v0.2.0."),
+      callback: () => void this.checkYandexConnection(),
     });
 
     this.app.workspace.onLayoutReady(() => {
@@ -68,8 +81,56 @@ export default class SyncerPlugin extends Plugin {
     });
   }
 
+  override onunload(): void {
+    this.abortController?.abort();
+  }
+
   async saveSettings(): Promise<void> {
     await this.savePluginData();
+  }
+
+  isYandexAuthorized(): boolean {
+    return this.requireAuthService().isAuthorized();
+  }
+
+  async beginYandexAuthorization(): Promise<string> {
+    return await this.requireAuthService().beginAuthorization();
+  }
+
+  async completeYandexAuthorization(code: string): Promise<void> {
+    await this.requireAuthService().exchangeCode(code);
+  }
+
+  async forgetYandexAuthorization(): Promise<void> {
+    await this.requireAuthService().forgetAuthorization();
+    new Notice("Локальная авторизация Яндекс Диска удалена.");
+  }
+
+  async checkYandexConnection(): Promise<void> {
+    try {
+      const result = await this.createYandexProvider().validateConnection();
+      new Notice(result.message);
+    } catch (error: unknown) {
+      new Notice(errorMessage(error));
+    }
+  }
+
+  async updateRemoteRoot(value: string): Promise<void> {
+    const nextRoot = normalizeRemoteRoot(value);
+    if (nextRoot !== normalizeRemoteRoot(this.settings.remoteRootPath)) {
+      this.syncState = emptySyncState();
+    }
+    this.settings.remoteRootPath = nextRoot;
+    await this.savePluginData();
+  }
+
+  openYandexFolderPicker(): void {
+    new YandexFolderPickerModal(this.app, {
+      initialPath: "/",
+      listFolders: (path, signal) => this.listYandexFolders(path, signal),
+      onChoose: (path) => this.updateRemoteRoot(path),
+      onError: (error) => new Notice(errorMessage(error)),
+    }).open();
   }
 
   async clearSnapshot(): Promise<void> {
@@ -95,20 +156,18 @@ export default class SyncerPlugin extends Plugin {
     }
 
     this.planning = true;
-    this.abortController = new AbortController();
+    const controller = new AbortController();
+    this.abortController = controller;
     this.setRibbonRunning(true);
     try {
       this.progress.report({
         stage: "listing-remote",
         current: 0,
         total: 0,
-        message: "Получение тестового remote index…",
+        message: "Получение списка файлов Яндекс Диска…",
       });
-      const provider = new MockRemoteStorageProvider(demoRemoteFiles());
-      const remoteFiles = await provider.listFiles(
-        this.settings.remoteRootPath,
-        this.abortController.signal,
-      );
+      const provider = this.createYandexProvider();
+      const remoteFiles = await provider.listFiles(this.settings.remoteRootPath, controller.signal);
 
       this.progress.report({
         stage: "scanning-local",
@@ -130,13 +189,16 @@ export default class SyncerPlugin extends Plugin {
       });
       const filter = new GlobPathFilter(this.settings.excludePatterns);
       const planner = new PullSyncPlanner(filter);
+      const remoteRoot = normalizeRemoteRoot(this.settings.remoteRootPath);
       this.lastPlan = planner.createPlan({
         remoteFiles,
         localFiles,
         previousState: this.syncState,
         remoteIndexComplete: true,
         remoteRootExists: true,
-        remoteRootChanged: false,
+        remoteRootChanged:
+          this.syncState.providerType !== "yandex-disk" ||
+          this.syncState.remoteRootPath !== remoteRoot,
         deleteMissingLocalFiles: this.settings.deleteMissingLocalFiles,
         deletionSafety: this.settings.deletionSafety,
         maxFileSizeBytes: this.settings.maxFileSizeBytes,
@@ -150,7 +212,7 @@ export default class SyncerPlugin extends Plugin {
       });
       this.showLastPlan();
     } catch (error: unknown) {
-      if (this.abortController.signal.aborted) return;
+      if (controller.signal.aborted) return;
       this.logger.error("Dry run failed", { error });
       this.progress.report({
         stage: "failed",
@@ -208,22 +270,29 @@ export default class SyncerPlugin extends Plugin {
     };
     await this.saveData(data);
   }
+
+  private async listYandexFolders(path: string, signal: AbortSignal): Promise<RemoteFolder[]> {
+    return await this.createYandexProvider().listFolders(path, signal);
+  }
+
+  private createYandexProvider(): YandexDiskProvider {
+    const authService = this.requireAuthService();
+    const client = new YandexApiClient({
+      transport: this.httpTransport,
+      accessToken: (signal) => authService.getValidAccessToken(signal),
+      logger: this.logger,
+      timeoutMs: this.settings.requestTimeoutMs,
+      retryCount: this.settings.retryCount,
+    });
+    return new YandexDiskProvider(client, this.settings.remoteRootPath);
+  }
+
+  private requireAuthService(): YandexAuthService {
+    if (this.authService === undefined) throw new Error("Yandex auth service is not initialized.");
+    return this.authService;
+  }
 }
 
 function asPluginData(value: unknown): Partial<PluginData> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value : undefined;
-}
-
-function demoRemoteFiles(): RemoteFile[] {
-  return [
-    {
-      path: "disk:/ObsidianVault/Syncer - demo.md",
-      relativePath: "Syncer - demo.md",
-      name: "Syncer - demo.md",
-      size: 128,
-      modifiedAt: 0,
-      revision: "mock-v1",
-      mimeType: "text/markdown",
-    },
-  ];
 }

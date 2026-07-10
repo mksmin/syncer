@@ -90,9 +90,9 @@ REST API подходит для mobile/desktop. Resource listing использ
 
 Актуальный OAuth допускает confirmation-code screen через
 `https://oauth.yandex.com/verification_code`; code живёт 10 минут. Документация поддерживает PKCE.
-Syncer не будет встраивать client secret. Для v0.2 нужен отдельный ADR: PKCE/public client, либо
-безопасный backend exchange; ручная вставка токена допустима только как явно описанный developer
-flow.
+Syncer v0.2 использует confirmation-code flow с PKCE S256 и не встраивает client secret. Token
+refresh отправляет `client_id` без secret; если конфигурация приложения Яндекса это отклоняет,
+пользователь проходит авторизацию заново. Secret в distributable plugin не добавляется.
 
 Источники: [Disk REST API](https://yandex.com/dev/disk/rest/),
 [confirmation code](https://yandex.com/dev/id/doc/en/codes/screen-code),

@@ -33,6 +33,9 @@ export function createDiagnosticSettings(settings: SyncerSettings): Record<strin
   return {
     ...settings,
     yandexAccessToken: "<redacted>",
+    yandexRefreshToken: "<redacted>",
+    yandexPendingPkceVerifier: "<redacted>",
+    yandexDeviceId: "<redacted>",
     webdav: { ...settings.webdav, password: "<redacted>" },
   };
 }
@@ -49,7 +52,16 @@ function pickKnownSettings(value: Record<string, unknown>): Partial<SyncerSettin
   assignBoolean(result, "showProgressModal", value.showProgressModal);
   assignBoolean(result, "showNotice", value.showNotice);
   assignString(result, "yandexAccessToken", value.yandexAccessToken);
+  assignString(result, "yandexRefreshToken", value.yandexRefreshToken);
   assignString(result, "yandexClientId", value.yandexClientId);
+  assignString(result, "yandexPendingPkceVerifier", value.yandexPendingPkceVerifier);
+  assignString(result, "yandexDeviceId", value.yandexDeviceId);
+  result.yandexTokenExpiresAt = clampInteger(
+    value.yandexTokenExpiresAt,
+    0,
+    Number.MAX_SAFE_INTEGER,
+    0,
+  );
   if (["error", "warn", "info", "debug"].includes(String(value.logLevel))) {
     result.logLevel = value.logLevel as SyncerSettings["logLevel"];
   }

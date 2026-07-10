@@ -1,15 +1,15 @@
 # Roadmap
 
-## v0.1.0 — foundation and research
+## v0.1.0 — foundation and research (done)
 
 Sample-compatible mobile skeleton; strict TS; build/lint/test/CI; settings; provider
 contract/factory; models; logger/errors; mock provider; progress; pure planner; state migration;
 architecture, research, pull-only and safe-delete ADRs. Result: desktop/iOS-loadable dry run, zero
 file changes.
 
-## v0.2.0 — read Yandex Disk
+## v0.2.0 — read Yandex Disk (current)
 
-Public-client-safe OAuth ADR/flow, token storage/revoke, connection check, exact root validation,
+Public-client-safe OAuth PKCE flow, token storage/forget, connection check, exact root validation,
 `requestUrl()` client, typed response guards, recursive pagination, MD5/revision mapping, retry with
 jitter/Retry-After/timeout/abort, remote folder picker, HTTP mocks. Result: complete remote file
 count; no local changes.

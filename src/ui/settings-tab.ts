@@ -1,4 +1,4 @@
-import { PluginSettingTab, Setting } from "obsidian";
+import { Notice, PluginSettingTab, Setting } from "obsidian";
 import type { App, TextAreaComponent } from "obsidian";
 import { DEFAULT_EXCLUDE_PATTERNS } from "../constants";
 import { validateGlob } from "../filters/path-filter";
@@ -19,34 +19,124 @@ export class SyncerSettingTab extends PluginSettingTab {
     new Setting(this.containerEl).setName("Подключение").setHeading();
     new Setting(this.containerEl)
       .setName("Удалённое хранилище")
-      .setDesc("Яндекс Диск будет подключён в v0.2.0. WebDAV планируется в v1.2.0.")
+      .setDesc("Яндекс Диск работает в read-only режиме. WebDAV планируется в v1.2.0.")
       .addDropdown((dropdown) => {
-        dropdown.addOption("yandex-disk", "Яндекс Диск (v0.2.0)");
+        dropdown.addOption("yandex-disk", "Яндекс Диск");
         dropdown.addOption("webdav", "WebDAV (планируется)");
         dropdown.setValue(this.plugin.settings.providerType);
         dropdown.setDisabled(true);
       });
 
     new Setting(this.containerEl)
+      .setName("Yandex OAuth Client ID")
+      .setDesc(
+        "Публичный идентификатор приложения. Client secret не нужен и не должен храниться в плагине.",
+      )
+      .addText((text) =>
+        text.setValue(this.plugin.settings.yandexClientId).onChange(async (value) => {
+          this.plugin.settings.yandexClientId = value.trim();
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    this.containerEl.createDiv({
+      cls: "syncer-sensitive-data-warning",
+      text: "Access token сохраняется в data.json. Не публикуйте и не прикладывайте этот файл к issue.",
+    });
+
+    if (this.plugin.isYandexAuthorized()) {
+      new Setting(this.containerEl)
+        .setName("Авторизация")
+        .setDesc("Яндекс Диск авторизован.")
+        .addButton((button) =>
+          button
+            .setButtonText("Проверить")
+            .onClick(async () => this.plugin.checkYandexConnection()),
+        )
+        .addButton((button) =>
+          button.setButtonText("Выйти").onClick(() => {
+            new ConfirmationModal(
+              this.app,
+              "Забыть авторизацию?",
+              "Access token и refresh token будут удалены из локального data.json.",
+              "Выйти",
+              async () => {
+                await this.plugin.forgetYandexAuthorization();
+                this.display();
+              },
+            ).open();
+          }),
+        );
+    } else {
+      new Setting(this.containerEl)
+        .setName("Авторизация")
+        .setDesc("Откройте Яндекс OAuth, разрешите доступ и скопируйте код подтверждения.")
+        .addButton((button) =>
+          button
+            .setButtonText("Авторизоваться")
+            .setCta()
+            .onClick(async () => {
+              try {
+                const url = await this.plugin.beginYandexAuthorization();
+                activeWindow.open(url, "_blank");
+              } catch (error: unknown) {
+                new Notice(error instanceof Error ? error.message : String(error));
+              }
+            }),
+        );
+
+      let authorizationCode = "";
+      new Setting(this.containerEl)
+        .setName("Код подтверждения")
+        .setDesc("Код действует 10 минут.")
+        .addText((text) =>
+          text.setPlaceholder("Вставьте код").onChange((value) => {
+            authorizationCode = value.trim();
+          }),
+        )
+        .addButton((button) =>
+          button.setButtonText("Подтвердить").onClick(async () => {
+            if (authorizationCode === "") {
+              new Notice("Введите код подтверждения.");
+              return;
+            }
+            button.setDisabled(true);
+            try {
+              await this.plugin.completeYandexAuthorization(authorizationCode);
+              new Notice("Яндекс Диск авторизован.");
+              this.display();
+            } catch (error: unknown) {
+              button.setDisabled(false);
+              new Notice(error instanceof Error ? error.message : String(error));
+            }
+          }),
+        );
+    }
+
+    new Setting(this.containerEl)
       .setName("Удалённая папка")
       .setDesc(
-        "После подключения Яндекс Диска папку можно будет выбрать из дерева. Смена пути потребует dry run.",
+        "Выберите существующую папку или введите путь. Смена пути сбрасывает snapshot trust.",
       )
       .addText((text) =>
         text
           .setPlaceholder("/Obsidian-vault")
           .setValue(this.plugin.settings.remoteRootPath)
           .onChange(async (value) => {
-            this.plugin.settings.remoteRootPath = value.trim() || "/ObsidianVault";
-            await this.plugin.saveSettings();
+            await this.plugin.updateRemoteRoot(value.trim() || "/");
           }),
       )
-      .addButton((button) => button.setButtonText("Выбрать…").setDisabled(true));
+      .addButton((button) =>
+        button
+          .setButtonText("Выбрать…")
+          .setDisabled(!this.plugin.isYandexAuthorized())
+          .onClick(() => this.plugin.openYandexFolderPicker()),
+      );
 
     new Setting(this.containerEl).setName("Синхронизация").setHeading();
     new Setting(this.containerEl)
       .setName("Удалять отсутствующие на сервере файлы")
-      .setDesc("В v0.1.0 операции только показываются в плане и не выполняются.")
+      .setDesc("В v0.2.0 операции только показываются в плане и не выполняются.")
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.deleteMissingLocalFiles).onChange(async (value) => {
           this.plugin.settings.deleteMissingLocalFiles = value;
@@ -119,7 +209,10 @@ export class SyncerSettingTab extends PluginSettingTab {
     });
     exclusionsSetting.addButton((button) =>
       button.setButtonText("Сбросить исключения").onClick(async () => {
-        this.plugin.settings.excludePatterns = [...DEFAULT_EXCLUDE_PATTERNS];
+        const conventionalConfigPattern = [".obsidian", "**"].join("/");
+        this.plugin.settings.excludePatterns = DEFAULT_EXCLUDE_PATTERNS.map((pattern) =>
+          pattern === conventionalConfigPattern ? `${this.app.vault.configDir}/**` : pattern,
+        );
         await this.plugin.saveSettings();
         exclusionsTextArea?.setValue(this.plugin.settings.excludePatterns.join("\n"));
         validationEl?.setText("Шаблоны сброшены");

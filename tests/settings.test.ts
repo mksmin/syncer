@@ -17,7 +17,7 @@ describe("settings", () => {
       concurrentDownloads: 99,
       deletionSafety: { maxDeletePercentage: -2 },
     });
-    expect(settings.schemaVersion).toBe(1);
+    expect(settings.schemaVersion).toBe(2);
     expect(settings.concurrentDownloads).toBe(5);
     expect(settings.deletionSafety.maxDeletePercentage).toBe(0);
   });
@@ -29,10 +29,14 @@ describe("settings", () => {
   it("never exports secrets", () => {
     const settings = migrateSettings({
       yandexAccessToken: "top-secret-token",
+      yandexRefreshToken: "top-secret-refresh-token",
+      yandexPendingPkceVerifier: "top-secret-verifier",
       webdav: { password: "top-secret-password" },
     });
     const diagnostic = JSON.stringify(createDiagnosticSettings(settings));
     expect(diagnostic).not.toContain("top-secret-token");
+    expect(diagnostic).not.toContain("top-secret-refresh-token");
+    expect(diagnostic).not.toContain("top-secret-verifier");
     expect(diagnostic).not.toContain("top-secret-password");
   });
 });

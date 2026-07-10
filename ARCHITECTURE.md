@@ -1,7 +1,7 @@
 # Syncer architecture
 
 Syncer — pull-only зеркало: remote storage является источником истины, локальный Obsidian vault —
-читаемой копией. v0.1.0 строит dry-run plan и ничего не меняет.
+читаемой копией. v0.2.0 читает реальный индекс Яндекс Диска, строит dry-run plan и ничего не меняет.
 
 ## Поток данных
 
@@ -19,7 +19,7 @@ provider регистрируется без изменения planner/executor
 ## Слои
 
 - `types`: provider-neutral remote/local/state/sync contracts;
-- `providers`: contract, factory, mock, отключённый WebDAV stub;
+- `providers`: contract, Yandex OAuth/API/provider, mock, отключённый WebDAV stub;
 - `filters` и `utils`: glob и vault-bound path normalization;
 - `sync`: pure comparator, deletion assessment, planner, progress, state repository;
 - `infrastructure`: typed errors, secret-redacting logger;
@@ -58,9 +58,9 @@ Logger получает только metadata и редактирует ключ
 
 ## Lifecycle
 
-`onload`: migrate data, register settings/ribbon/commands. Startup sync в будущей версии запускается
-только внутри `workspace.onLayoutReady()` с delay и session lock. `onunload`: abort и provider
-dispose.
+`onload`: migrate data, initialize OAuth transport, register settings/ribbon/commands. Startup sync
+в будущей версии запускается только внутри `workspace.onLayoutReady()` с delay и session lock.
+`onunload`: abort и provider dispose.
 
 ## WebDAV extension
 

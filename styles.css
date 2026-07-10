@@ -43,6 +43,35 @@
   color: var(--text-error);
 }
 
+.syncer-folder-picker-path {
+  background: var(--background-secondary);
+  border-radius: var(--radius-s);
+  font-family: var(--font-monospace);
+  margin-bottom: var(--size-4-3);
+  overflow-wrap: anywhere;
+  padding: var(--size-4-2) var(--size-4-3);
+}
+
+.syncer-folder-picker-list {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.syncer-folder-picker-empty,
+.syncer-folder-picker-loading {
+  color: var(--text-muted);
+  padding: var(--size-4-4) 0;
+  text-align: center;
+}
+
+.syncer-sensitive-data-warning {
+  background: var(--background-modifier-error-hover);
+  border-radius: var(--radius-s);
+  color: var(--text-warning);
+  margin: var(--size-4-2) 0 var(--size-4-4);
+  padding: var(--size-4-3);
+}
+
 @keyframes syncer-pulse {
   50% {
     opacity: 0.45;

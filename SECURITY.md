@@ -15,12 +15,14 @@ replacing good local data, secret leakage in diagnostics.
 - content verified in memory before future Vault write;
 - logger redacts token/auth/password/secret keys and never logs file content;
 - plugin data uses Obsidian `loadData()`/`saveData()`; `data.json` ignored by Git;
-- no client secret ships in plugin. OAuth design must use public-client-safe flow/PKCE or secure
-  exchange.
+- no client secret ships in plugin. OAuth uses confirmation-code flow with PKCE S256;
+- v0.2 performs only remote GET/metadata calls and zero local file mutations;
+- cancellation is cooperative because Obsidian `requestUrl()` exposes no `AbortSignal`: Syncer
+  ignores a late response and starts no following request.
 
 ## Sensitive data
 
-Future `data.json` contains Yandex access token and may later contain WebDAV credentials. Do not
+`data.json` contains Yandex access/refresh tokens and may later contain WebDAV credentials. Do not
 share, sync through public Git, attach to issues or include in diagnostic export. Revoked/401 token
 must be forgotten through settings and reauthorized.
 
