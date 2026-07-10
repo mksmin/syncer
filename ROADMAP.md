@@ -11,7 +11,8 @@ file changes.
 
 Public-client-safe OAuth ADR/flow, token storage/revoke, connection check, exact root validation,
 `requestUrl()` client, typed response guards, recursive pagination, MD5/revision mapping, retry with
-jitter/Retry-After/timeout/abort, HTTP mocks. Result: complete remote file count; no local changes.
+jitter/Retry-After/timeout/abort, remote folder picker, HTTP mocks. Result: complete remote file
+count; no local changes.
 
 ## v0.3.0 — real dry run
 

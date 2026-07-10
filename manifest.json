@@ -4,6 +4,6 @@
   "version": "0.1.0",
   "minAppVersion": "1.6.0",
   "description": "Safely plans a pull-only mirror from remote storage to a local vault.",
-  "author": "Syncer contributors",
+  "author": "mksmin",
   "isDesktopOnly": false
 }

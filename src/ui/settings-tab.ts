@@ -29,7 +29,9 @@ export class SyncerSettingTab extends PluginSettingTab {
 
     new Setting(this.containerEl)
       .setName("Удалённая папка")
-      .setDesc("Смена пути в будущих версиях потребует dry run и заблокирует первое удаление.")
+      .setDesc(
+        "После подключения Яндекс Диска папку можно будет выбрать из дерева. Смена пути потребует dry run.",
+      )
       .addText((text) =>
         text
           .setPlaceholder("/Obsidian-vault")
@@ -38,7 +40,8 @@ export class SyncerSettingTab extends PluginSettingTab {
             this.plugin.settings.remoteRootPath = value.trim() || "/ObsidianVault";
             await this.plugin.saveSettings();
           }),
-      );
+      )
+      .addButton((button) => button.setButtonText("Выбрать…").setDisabled(true));
 
     new Setting(this.containerEl).setName("Синхронизация").setHeading();
     new Setting(this.containerEl)
@@ -69,15 +72,19 @@ export class SyncerSettingTab extends PluginSettingTab {
     new Setting(this.containerEl)
       .setName("Параллельные загрузки")
       .setDesc("Подготовлено для download executor; диапазон 1–5.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(1, 5, 1)
-          .setValue(this.plugin.settings.concurrentDownloads)
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption("1", "1 файл")
+          .addOption("2", "2 файла")
+          .addOption("3", "3 файла")
+          .addOption("4", "4 файла")
+          .addOption("5", "5 файлов")
+          .setValue(String(this.plugin.settings.concurrentDownloads))
           .onChange(async (value) => {
-            this.plugin.settings.concurrentDownloads = value;
+            this.plugin.settings.concurrentDownloads = Number.parseInt(value, 10);
             await this.plugin.saveSettings();
-          }),
-      );
+          });
+      });
 
     new Setting(this.containerEl).setName("Фильтры").setHeading();
     let validationEl: HTMLElement | undefined;
@@ -102,15 +109,16 @@ export class SyncerSettingTab extends PluginSettingTab {
           this.plugin.settings.excludePatterns = patterns;
           await this.plugin.saveSettings();
         });
-      })
-      .addButton((button) =>
-        button.setButtonText("Сбросить").onClick(async () => {
-          this.plugin.settings.excludePatterns = [...DEFAULT_EXCLUDE_PATTERNS];
-          await this.plugin.saveSettings();
-          this.display();
-        }),
-      );
+      });
     validationEl = this.containerEl.createDiv({ text: "Шаблоны корректны." });
+    const resetExclusionsSetting = new Setting(this.containerEl).addButton((button) =>
+      button.setButtonText("Сбросить исключения").onClick(async () => {
+        this.plugin.settings.excludePatterns = [...DEFAULT_EXCLUDE_PATTERNS];
+        await this.plugin.saveSettings();
+        this.display();
+      }),
+    );
+    resetExclusionsSetting.settingEl.addClass("syncer-exclusions-actions");
 
     new Setting(this.containerEl)
       .setName("Конфигурация Obsidian")

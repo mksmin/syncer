@@ -6,6 +6,11 @@
   animation: syncer-pulse 1.2s ease-in-out infinite;
 }
 
+.syncer-exclusions-actions {
+  border-top: 0;
+  padding-top: 0;
+}
+
 @keyframes syncer-pulse {
   50% {
     opacity: 0.45;
