@@ -1,0 +1,13 @@
+.syncer-settings-warning {
+  color: var(--text-warning);
+}
+
+.syncer-ribbon.is-planning {
+  animation: syncer-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes syncer-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}

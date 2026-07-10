@@ -1,0 +1,9 @@
+node_modules/
+.pnpm-store/
+main.js
+*.js.map
+coverage/
+data.json
+.DS_Store
+.idea/
+.vscode/
