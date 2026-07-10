@@ -57,6 +57,13 @@ function pickKnownSettings(value: Record<string, unknown>): Partial<SyncerSettin
   }
   assignString(result, "remoteRootPath", value.remoteRootPath);
   assignBoolean(result, "syncOnStartup", value.syncOnStartup);
+  if (
+    value.backgroundSyncMode === "all" ||
+    value.backgroundSyncMode === "new" ||
+    value.backgroundSyncMode === "updates"
+  ) {
+    result.backgroundSyncMode = value.backgroundSyncMode;
+  }
   assignBoolean(result, "deleteMissingLocalFiles", value.deleteMissingLocalFiles);
   assignBoolean(result, "syncObsidianConfig", value.syncObsidianConfig);
   assignBoolean(result, "showProgressModal", value.showProgressModal);

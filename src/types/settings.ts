@@ -16,11 +16,14 @@ export interface WebDavSettings {
   remoteRootPath: string;
 }
 
+export type BackgroundSyncMode = "all" | "new" | "updates";
+
 export interface SyncerSettings {
   schemaVersion: number;
   providerType: RemoteProviderType;
   remoteRootPath: string;
   syncOnStartup: boolean;
+  backgroundSyncMode: BackgroundSyncMode;
   startupDelaySeconds: number;
   deleteMissingLocalFiles: boolean;
   deletionSafety: DeletionSafetySettings;
@@ -42,10 +45,11 @@ export interface SyncerSettings {
 }
 
 export const DEFAULT_SETTINGS: SyncerSettings = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   providerType: "yandex-disk",
   remoteRootPath: "/ObsidianVault",
   syncOnStartup: false,
+  backgroundSyncMode: "all",
   startupDelaySeconds: 5,
   deleteMissingLocalFiles: true,
   deletionSafety: {

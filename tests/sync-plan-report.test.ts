@@ -55,8 +55,26 @@ describe("sync plan report", () => {
     const download = value.operations[0];
     const skip = value.operations[1];
     if (download === undefined || skip === undefined) throw new Error("Missing report operations.");
-    expect(operationDetail(download)).toBe("2.00 КБ");
+    expect(operationDetail(download)).toContain("На сервере: 2.00 КБ");
     expect(operationDetail(skip)).toBe("Исключено фильтром");
+  });
+
+  it("explains update size and date differences", () => {
+    const detail = operationDetail({
+      type: "UPDATE_LOCAL",
+      relativePath: "A.md",
+      remoteFile: {
+        path: "disk:/A.md",
+        relativePath: "A.md",
+        name: "A.md",
+        size: 3_072,
+        modifiedAt: 2_000,
+      },
+      localFile: { relativePath: "A.md", size: 1_024, modifiedAt: 1_000 },
+    });
+    expect(detail).toContain("1.00 КБ → 3.00 КБ (+2.00 КБ)");
+    expect(detail).toContain("На сервере:");
+    expect(detail).toContain("локально:");
   });
 
   it("describes blocked deletion candidates", () => {

@@ -27,7 +27,7 @@ abort and partial result. Existing local files remain untouched.
 ## v0.5.0 — update local files (current)
 
 Verified `UPDATE_LOCAL`, old-copy preservation on failure, per-file snapshot, result/progress modal,
-startup sync without trash.
+startup/background sync rule without trash, separate planned sync UI and file difference details.
 
 ## v0.6.0 — safe trash
 
@@ -37,7 +37,8 @@ and percentage confirmation, startup defer, mass-delete tests.
 ## v0.7.0 — settings and UX
 
 Full settings sections, auth UI, ribbon states, throttled progress/Notice, result/error details,
-dangerous confirmations, RU/EN-ready strings, mobile layout.
+dangerous confirmations, RU/EN-ready strings, mobile layout, checkboxes for selecting individual
+files and an action that syncs only the selection.
 
 ## v0.8.0 — iOS stabilization
 
@@ -52,7 +53,7 @@ documentation, tests and release workflow. Real iPhone verification required.
 ## v1.1.0 — history and diagnostics
 
 Recent runs, redacted diagnostics, timings, retry failed files, copyable report, improved debug
-mode.
+mode. RFC for optional remote index manifest; local persistent cache remains preferred.
 
 ## v1.2.0 — WebDAV
 

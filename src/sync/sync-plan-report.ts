@@ -26,9 +26,52 @@ export function buildPlanSections(plan: SyncPlan): SyncPlanSection[] {
 }
 
 export function operationDetail(operation: SyncOperation): string {
-  if (operation.type === "SKIP") return SKIP_LABELS[operation.reason];
-  if (operation.type === "TRASH_LOCAL") return formatBytes(operation.localFile.size);
-  return formatBytes(operation.remoteFile.size);
+  if (operation.type === "DOWNLOAD_NEW") {
+    return `На сервере: ${formatBytes(operation.remoteFile.size)}; изменён ${formatDate(operation.remoteFile.modifiedAt)}.`;
+  }
+  if (operation.type === "UPDATE_LOCAL") return updateDetail(operation);
+  if (operation.type === "TRASH_LOCAL") {
+    return `Локально: ${formatBytes(operation.localFile.size)}; изменён ${formatDate(operation.localFile.modifiedAt)}.`;
+  }
+  const label = SKIP_LABELS[operation.reason];
+  if (operation.remoteFile !== undefined && operation.localFile !== undefined) {
+    return `${label}. На сервере: ${formatBytes(operation.remoteFile.size)}, ${formatDate(operation.remoteFile.modifiedAt)}; локально: ${formatBytes(operation.localFile.size)}, ${formatDate(operation.localFile.modifiedAt)}.`;
+  }
+  if (operation.remoteFile !== undefined) {
+    return `${label}. На сервере: ${formatBytes(operation.remoteFile.size)}, ${formatDate(operation.remoteFile.modifiedAt)}.`;
+  }
+  if (operation.localFile !== undefined) {
+    return `${label}. Локально: ${formatBytes(operation.localFile.size)}, ${formatDate(operation.localFile.modifiedAt)}.`;
+  }
+  return label;
+}
+
+function updateDetail(operation: Extract<SyncOperation, { type: "UPDATE_LOCAL" }>): string {
+  const remote = operation.remoteFile;
+  const local = operation.localFile;
+  const sizeDelta = remote.size - local.size;
+  const reason =
+    sizeDelta !== 0
+      ? `размер ${formatBytes(local.size)} → ${formatBytes(remote.size)} (${formatSizeDelta(sizeDelta)})`
+      : remote.modifiedAt !== local.modifiedAt
+        ? "размер одинаковый, даты изменения отличаются"
+        : "размер и дата совпадают, но нет подтверждённого результата предыдущей синхронизации";
+  return `Причина: ${reason}. На сервере: ${formatDate(remote.modifiedAt)}; локально: ${formatDate(local.modifiedAt)}.`;
+}
+
+function formatSizeDelta(bytes: number): string {
+  const sign = bytes > 0 ? "+" : "−";
+  return `${sign}${formatBytes(Math.abs(bytes))}`;
+}
+
+function formatDate(milliseconds: number): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(milliseconds));
 }
 
 export function deletionWarning(plan: SyncPlan): string | undefined {

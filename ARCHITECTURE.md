@@ -62,8 +62,10 @@ Logger получает только metadata и редактирует ключ
 ## Lifecycle
 
 `onload`: migrate data, initialize OAuth transport, register settings/ribbon/commands. Opt-in
-startup sync запускается только внутри `workspace.onLayoutReady()` с delay и session lock; в v0.5 он
-выполняет new/update без trash. `onunload`: abort и provider dispose.
+startup sync запускается только внутри `workspace.onLayoutReady()` с delay и session lock. Startup и
+команда `Синхронизировать сейчас` выполняются в фоне по одному правилу настроек; плановая команда
+всегда требует явного выбора. Любой вызов во время active session переоткрывает её modal, а не
+создаёт конкурентную session. `onunload`: abort и provider dispose.
 
 ## WebDAV extension
 

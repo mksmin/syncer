@@ -133,6 +133,22 @@ export class SyncerSettingTab extends PluginSettingTab {
       );
 
     new Setting(this.containerEl)
+      .setName("Правило фоновой синхронизации")
+      .setDesc("Используется при запуске vault и командой «Синхронизировать сейчас».")
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption("all", "Новые и изменённые")
+          .addOption("new", "Только новые файлы")
+          .addOption("updates", "Только обновления")
+          .setValue(this.plugin.settings.backgroundSyncMode)
+          .onChange(async (value) => {
+            if (value !== "all" && value !== "new" && value !== "updates") return;
+            this.plugin.settings.backgroundSyncMode = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(this.containerEl)
       .setName("Задержка запуска")
       .setDesc("Пауза после готовности интерфейса Obsidian.")
       .addDropdown((dropdown) => {

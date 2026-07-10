@@ -9,6 +9,10 @@
 - Wrong/missing root: critical warning; zero trash.
 - 80% removal: startup defers trash; manual modal offers three choices.
 - Root/provider change: snapshot trust reset; mandatory dry run; first trash blocked.
+- Background rule `new`: updates remain untouched; `updates`: new files remain untouched; `all`:
+  both execute without opening a modal.
+- Open planned sync during background work: same session/progress opens; no second listing/executor.
+- Update rows explain size delta and remote/local modification dates.
 
 v0.2 automates planner, Yandex pagination/recursion, typed HTTP errors, retry, cancellation, binary
 download transport and PKCE token flow. v0.3 adds strict persisted-state validation, exact snapshot

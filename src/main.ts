@@ -17,6 +17,7 @@ import {
   type UpdateVaultFile,
 } from "./sync/update-file-executor";
 import { SyncProgressReporter } from "./sync/progress-reporter";
+import { selectPullOperations, type PullSelection } from "./sync/sync-operation-selection";
 import { migrateSyncPlan } from "./sync/sync-plan-storage";
 import { PullSyncPlanner } from "./sync/sync-planner";
 import { emptySyncState, isSnapshotBoundTo, migrateSyncState } from "./sync/sync-state-repository";
@@ -32,8 +33,6 @@ import { YandexFolderPickerModal } from "./ui/yandex-folder-picker-modal";
 
 const REMOTE_INDEX_CACHE_TTL_MS = 60_000;
 const SYNC_COOLDOWN_MS = 30_000;
-
-type PullSelection = "all" | "new" | "updates";
 
 interface RemoteIndexCache {
   remoteRoot: string;
@@ -83,13 +82,13 @@ export default class SyncerPlugin extends Plugin {
 
     this.addCommand({
       id: "show-dry-run",
-      name: "Показать план синхронизации",
+      name: "Плановая синхронизация",
       callback: () => void this.showDryRun(),
     });
     this.addCommand({
       id: "sync-now",
       name: "Синхронизировать сейчас",
-      callback: () => void this.preparePullSync(),
+      callback: () => void this.runBackgroundSync("manual"),
     });
     this.addCommand({
       id: "stop-sync",
@@ -115,7 +114,7 @@ export default class SyncerPlugin extends Plugin {
       this.progress.report({ stage: "idle", current: 0, total: 0, message: "Ожидание" });
       if (!this.settings.syncOnStartup) return;
       const timeoutId = window.setTimeout(() => {
-        void this.preparePullSync(false);
+        void this.runBackgroundSync("startup");
       }, this.settings.startupDelaySeconds * 1_000);
       this.register(() => window.clearTimeout(timeoutId));
     });
@@ -274,29 +273,28 @@ export default class SyncerPlugin extends Plugin {
     }
   }
 
-  private async preparePullSync(requireConfirmation = true): Promise<void> {
+  private async runBackgroundSync(source: "manual" | "startup"): Promise<void> {
     if (this.planning) {
       this.reopenActiveOperation();
       return;
     }
     const modal = new DryRunModal(this.app);
-    modal.open();
     const plan = await this.preparePlanForExecution(modal);
     if (plan === undefined) return;
-    const downloads = downloadOperations(plan);
-    const updates = updateOperations(plan);
+    const { downloads, updates } = selectPullOperations(plan, this.settings.backgroundSyncMode);
     if (downloads.length === 0 && updates.length === 0) {
-      modal.setProgress("Новых и изменённых файлов нет", 1, 1);
-      new Notice("Новых и изменённых файлов нет.");
+      modal.setProgress("По правилу фоновой синхронизации изменений нет", 1, 1);
+      this.lastSessionModal = modal;
+      if (source === "manual" && this.settings.showNotice) {
+        new Notice("Фоновая синхронизация: изменений нет.");
+      }
       return;
     }
     const root = normalizeRemoteRoot(this.settings.remoteRootPath);
-    this.setPlanActions(modal, plan, root);
-    if (!requireConfirmation) {
-      await this.executePullSync(downloads, updates, root, modal);
-      return;
-    }
-    this.confirmPlanExecution(plan, "all", modal, root);
+    await this.executePullSync(downloads, updates, root, modal, {
+      background: true,
+      showCompletionNotice: source === "manual" && this.settings.showNotice,
+    });
   }
 
   private async preparePlanForExecution(modal: DryRunModal): Promise<SyncPlan | undefined> {
@@ -358,6 +356,7 @@ export default class SyncerPlugin extends Plugin {
     updates: readonly UpdateLocalOperation[],
     remoteRoot: string,
     modal: DryRunModal,
+    options: { background?: boolean; showCompletionNotice?: boolean } = {},
   ): Promise<void> {
     if (normalizeRemoteRoot(this.settings.remoteRootPath) !== remoteRoot) {
       new Notice("Удалённый root изменился. Сначала создайте новый dry run.");
@@ -375,7 +374,12 @@ export default class SyncerPlugin extends Plugin {
     const controller = new AbortController();
     this.abortController = controller;
     this.setRibbonRunning(true);
-    this.activateModal(modal, "Синхронизация выполняется…");
+    this.activateModal(
+      modal,
+      options.background === true
+        ? "Фоновая синхронизация выполняется…"
+        : "Синхронизация выполняется…",
+    );
     this.lastSessionModal = modal;
     const total = downloads.length + updates.length;
     modal.setProgress("Начало синхронизации…", 0, total);
@@ -424,10 +428,12 @@ export default class SyncerPlugin extends Plugin {
         total,
         message: `Создано ${String(newResult.created.length)}; обновлено ${String(updateResult.updated.length)}; ошибок ${String(errors.length)}`,
       });
-      new Notice(
-        `Создано ${String(newResult.created.length)}, обновлено ${String(updateResult.updated.length)}, ошибок ${String(errors.length)}. Удаления не выполнялись.`,
-        10_000,
-      );
+      if (options.showCompletionNotice ?? this.settings.showNotice) {
+        new Notice(
+          `Создано ${String(newResult.created.length)}, обновлено ${String(updateResult.updated.length)}, ошибок ${String(errors.length)}. Удаления не выполнялись.`,
+          10_000,
+        );
+      }
       modal.setProgress(
         status === "cancelled"
           ? "Синхронизация остановлена"
@@ -507,8 +513,7 @@ export default class SyncerPlugin extends Plugin {
       this.reopenActiveOperation();
       return;
     }
-    const downloads = selection === "updates" ? [] : downloadOperations(plan);
-    const updates = selection === "new" ? [] : updateOperations(plan);
+    const { downloads, updates } = selectPullOperations(plan, selection);
     if (downloads.length === 0 && updates.length === 0) {
       new Notice("Для выбранного действия нет файлов.");
       return;
@@ -633,18 +638,6 @@ export default class SyncerPlugin extends Plugin {
 
 function asPluginData(value: unknown): Partial<PluginData> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value : undefined;
-}
-
-function downloadOperations(plan: SyncPlan): DownloadNewOperation[] {
-  return plan.operations.filter(
-    (operation): operation is DownloadNewOperation => operation.type === "DOWNLOAD_NEW",
-  );
-}
-
-function updateOperations(plan: SyncPlan): UpdateLocalOperation[] {
-  return plan.operations.filter(
-    (operation): operation is UpdateLocalOperation => operation.type === "UPDATE_LOCAL",
-  );
 }
 
 function createUpdateFileVault(vault: Vault): UpdateFileVault {
