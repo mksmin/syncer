@@ -1,5 +1,5 @@
 import { PluginSettingTab, Setting } from "obsidian";
-import type { App } from "obsidian";
+import type { App, TextAreaComponent } from "obsidian";
 import { DEFAULT_EXCLUDE_PATTERNS } from "../constants";
 import { validateGlob } from "../filters/path-filter";
 import type SyncerPlugin from "../main";
@@ -88,37 +88,44 @@ export class SyncerSettingTab extends PluginSettingTab {
 
     new Setting(this.containerEl).setName("Фильтры").setHeading();
     let validationEl: HTMLElement | undefined;
-    new Setting(this.containerEl)
+    let exclusionsTextArea: TextAreaComponent | undefined;
+    const exclusionsSetting = new Setting(this.containerEl)
       .setName("Исключения")
-      .setDesc("Один glob на строку. Исключённые пути не скачиваются и не удаляются.")
-      .addTextArea((text) => {
-        text.inputEl.rows = 9;
-        text.setValue(this.plugin.settings.excludePatterns.join("\n")).onChange(async (value) => {
-          const patterns = value
-            .split("\n")
-            .map((pattern) => pattern.trim())
-            .filter(Boolean);
-          const invalid = patterns.find((pattern) => !validateGlob(pattern).valid);
-          if (invalid !== undefined) {
-            validationEl?.setText(`Ошибка glob: ${invalid}`);
-            validationEl?.addClass("syncer-settings-warning");
-            return;
-          }
-          validationEl?.setText("Шаблоны корректны.");
-          validationEl?.removeClass("syncer-settings-warning");
-          this.plugin.settings.excludePatterns = patterns;
-          await this.plugin.saveSettings();
-        });
+      .setDesc("Один glob на строку. Исключённые пути не скачиваются и не удаляются.");
+    exclusionsSetting.settingEl.addClass("syncer-exclusions-setting");
+    exclusionsSetting.addTextArea((text) => {
+      exclusionsTextArea = text;
+      text.inputEl.rows = 9;
+      text.setValue(this.plugin.settings.excludePatterns.join("\n")).onChange(async (value) => {
+        const patterns = value
+          .split("\n")
+          .map((pattern) => pattern.trim())
+          .filter(Boolean);
+        const invalid = patterns.find((pattern) => !validateGlob(pattern).valid);
+        if (invalid !== undefined) {
+          validationEl?.setText(`Ошибка glob: ${invalid}`);
+          validationEl?.addClass("is-error");
+          return;
+        }
+        validationEl?.setText("Шаблоны корректны");
+        validationEl?.removeClass("is-error");
+        this.plugin.settings.excludePatterns = patterns;
+        await this.plugin.saveSettings();
       });
-    validationEl = this.containerEl.createDiv({ text: "Шаблоны корректны." });
-    const resetExclusionsSetting = new Setting(this.containerEl).addButton((button) =>
+    });
+    validationEl = exclusionsSetting.controlEl.createDiv({
+      cls: "syncer-glob-validation",
+      text: "Шаблоны корректны",
+    });
+    exclusionsSetting.addButton((button) =>
       button.setButtonText("Сбросить исключения").onClick(async () => {
         this.plugin.settings.excludePatterns = [...DEFAULT_EXCLUDE_PATTERNS];
         await this.plugin.saveSettings();
-        this.display();
+        exclusionsTextArea?.setValue(this.plugin.settings.excludePatterns.join("\n"));
+        validationEl?.setText("Шаблоны сброшены");
+        validationEl?.removeClass("is-error");
       }),
     );
-    resetExclusionsSetting.settingEl.addClass("syncer-exclusions-actions");
 
     new Setting(this.containerEl)
       .setName("Конфигурация Obsidian")

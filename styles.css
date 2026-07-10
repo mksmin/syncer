@@ -6,9 +6,41 @@
   animation: syncer-pulse 1.2s ease-in-out infinite;
 }
 
-.syncer-exclusions-actions {
-  border-top: 0;
-  padding-top: 0;
+.syncer-exclusions-setting {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.syncer-exclusions-setting .setting-item-info,
+.syncer-exclusions-setting .setting-item-control {
+  width: 100%;
+}
+
+.syncer-exclusions-setting .setting-item-control {
+  align-items: stretch;
+  flex-direction: column;
+  gap: var(--size-4-2);
+  margin-top: var(--size-4-3);
+}
+
+.syncer-exclusions-setting textarea {
+  min-height: 14rem;
+  resize: vertical;
+  width: 100%;
+}
+
+.syncer-exclusions-setting button {
+  width: 100%;
+}
+
+.syncer-glob-validation {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: var(--line-height-tight);
+}
+
+.syncer-glob-validation.is-error {
+  color: var(--text-error);
 }
 
 @keyframes syncer-pulse {
