@@ -65,7 +65,7 @@ export class YandexApiClient {
   }
 
   async download(href: string, signal?: AbortSignal): Promise<ArrayBuffer> {
-    const response = await this.request(href, signal, false);
+    const response = await this.request(href, signal, false, "binary");
     return response.arrayBuffer;
   }
 
@@ -73,6 +73,7 @@ export class YandexApiClient {
     url: string,
     signal: AbortSignal | undefined,
     authenticated = true,
+    responseType: "json" | "binary" = "json",
   ): Promise<HttpResponse> {
     for (let attempt = 0; ; attempt += 1) {
       throwIfAborted(signal);
@@ -83,6 +84,7 @@ export class YandexApiClient {
           this.options.transport.request({
             url,
             method: "GET",
+            responseType,
             headers: token === undefined ? {} : { Authorization: `OAuth ${token}` },
           }),
           this.options.timeoutMs,

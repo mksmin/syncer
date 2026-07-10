@@ -17,9 +17,14 @@ describe("settings", () => {
       concurrentDownloads: 99,
       deletionSafety: { maxDeletePercentage: -2 },
     });
-    expect(settings.schemaVersion).toBe(3);
+    expect(settings.schemaVersion).toBe(4);
     expect(settings.concurrentDownloads).toBe(5);
     expect(settings.deletionSafety.maxDeletePercentage).toBe(0);
+  });
+
+  it("adds the Codex metadata exclusion to existing settings", () => {
+    const settings = migrateSettings({ schemaVersion: 3, excludePatterns: ["Private/**"] });
+    expect(settings.excludePatterns).toEqual(["Private/**", ".codex/**"]);
   });
 
   it("detects invalid glob", () => {

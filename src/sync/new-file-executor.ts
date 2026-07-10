@@ -119,7 +119,13 @@ export class NewFileExecutor {
       }
       return;
     }
-    await this.options.vault.createFolder(path);
+    try {
+      await this.options.vault.createFolder(path);
+    } catch (error: unknown) {
+      const createdByAnotherJob = this.options.vault.getAbstractFileByPath(path);
+      if (createdByAnotherJob?.children !== undefined) return;
+      throw error;
+    }
   }
 }
 

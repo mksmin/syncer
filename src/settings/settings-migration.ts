@@ -1,3 +1,4 @@
+import { CODEX_EXCLUDE_PATTERN } from "../constants";
 import { DEFAULT_SETTINGS, type SyncerSettings } from "../types/settings";
 
 export function migrateSettings(value: unknown): SyncerSettings {
@@ -15,7 +16,7 @@ export function migrateSettings(value: unknown): SyncerSettings {
       maxDeleteCount: clampInteger(deletion.maxDeleteCount, 0, 100_000, 20),
       maxDeletePercentage: clampNumber(deletion.maxDeletePercentage, 0, 100, 20),
     },
-    excludePatterns: stringArray(input.excludePatterns, DEFAULT_SETTINGS.excludePatterns),
+    excludePatterns: migrateExcludePatterns(input),
     maxFileSizeBytes: clampInteger(
       input.maxFileSizeBytes,
       1,
@@ -27,6 +28,15 @@ export function migrateSettings(value: unknown): SyncerSettings {
       ...pickWebDavSettings(webdav),
     },
   };
+}
+
+function migrateExcludePatterns(input: Record<string, unknown>): string[] {
+  const patterns = stringArray(input.excludePatterns, DEFAULT_SETTINGS.excludePatterns);
+  const schemaVersion = Number.isInteger(input.schemaVersion) ? Number(input.schemaVersion) : 0;
+  if (schemaVersion < 4 && !patterns.includes(CODEX_EXCLUDE_PATTERN)) {
+    patterns.push(CODEX_EXCLUDE_PATTERN);
+  }
+  return patterns;
 }
 
 export function createDiagnosticSettings(settings: SyncerSettings): Record<string, unknown> {

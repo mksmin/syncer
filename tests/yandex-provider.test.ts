@@ -207,6 +207,7 @@ describe("YandexDiskProvider", () => {
     );
     expect([...new Uint8Array(result)]).toEqual([0, 1, 2, 255]);
     expect(transport.requests[1]?.headers).toEqual({});
+    expect(transport.requests[1]?.responseType).toBe("binary");
   });
 
   it("rejects an incomplete page", async () => {

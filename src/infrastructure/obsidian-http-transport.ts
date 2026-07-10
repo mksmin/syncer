@@ -3,13 +3,14 @@ import type { HttpRequest, HttpResponse, HttpTransport } from "./http-transport"
 
 export class ObsidianHttpTransport implements HttpTransport {
   async request(request: HttpRequest): Promise<HttpResponse> {
-    const response = await requestUrl({ ...request, throw: false });
+    const { responseType = "json", ...options } = request;
+    const response = await requestUrl({ ...options, throw: false });
     return {
       status: response.status,
       headers: response.headers,
       arrayBuffer: response.arrayBuffer,
-      json: response.json as unknown,
-      text: response.text,
+      json: responseType === "binary" ? undefined : (response.json as unknown),
+      text: responseType === "binary" ? "" : response.text,
     };
   }
 }

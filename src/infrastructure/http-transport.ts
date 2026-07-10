@@ -1,6 +1,7 @@
 export interface HttpRequest {
   url: string;
   method?: string;
+  responseType?: "json" | "binary";
   contentType?: string;
   body?: string | ArrayBuffer;
   headers?: Record<string, string>;

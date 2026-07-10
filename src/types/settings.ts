@@ -42,7 +42,7 @@ export interface SyncerSettings {
 }
 
 export const DEFAULT_SETTINGS: SyncerSettings = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   providerType: "yandex-disk",
   remoteRootPath: "/ObsidianVault",
   syncOnStartup: false,

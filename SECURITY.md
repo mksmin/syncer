@@ -18,6 +18,8 @@ corrupted download replacing good local data, secret leakage in diagnostics.
 - no client secret ships in plugin. OAuth uses confirmation-code flow with PKCE S256;
 - v0.5 обновляет local file только при совпадении size/mtime с dry run, держит старые bytes в памяти
   и восстанавливает их при ошибке записи; trash заблокирован;
+- binary downloads читаются только как `ArrayBuffer`; transport не запускает JSON parser для
+  содержимого заметок, изображений, PDF и других файлов;
 - cancellation is cooperative because Obsidian `requestUrl()` exposes no `AbortSignal`: Syncer
   ignores a late response and starts no following request.
 

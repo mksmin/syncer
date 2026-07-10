@@ -9,7 +9,7 @@ UGREEN NAS появится позже.
 > Синхронизация не является резервным копированием. Перед первым использованием сделайте независимую
 > резервную копию.
 
-## Current release: v0.5.0
+## Current release: v0.5.1
 
 Работают OAuth confirmation-code + PKCE без client secret, проверка подключения, выбор существующей
 папки, рекурсивный индекс Яндекс Диска со всей пагинацией, retry/Retry-After/timeout/отмена и
@@ -76,10 +76,10 @@ Remote новые файлы скачиваются, изменённые зам
 
 ## Exclusions
 
-Defaults: `.obsidian/**`, `.trash/**`, `.git/**`, `.DS_Store`, `Thumbs.db`, `*.tmp`, `*.part`.
-Excluded files не download/update/trash и не входят в delete percentage. `.obsidian` полностью
-отложена до отдельной версии; workspace, cache и plugin `data.json` нельзя безопасно зеркалировать
-между устройствами по умолчанию.
+Defaults: `.obsidian/**`, `.trash/**`, `.git/**`, `.codex/**`, `.DS_Store`, `Thumbs.db`, `*.tmp`,
+`*.part`. Excluded files не download/update/trash и не входят в delete percentage. `.obsidian`
+полностью отложена до отдельной версии; workspace, cache и plugin `data.json` нельзя безопасно
+зеркалировать между устройствами по умолчанию.
 
 ## iOS limits
 

@@ -11,12 +11,19 @@ class MemoryVault implements NewFileVault {
   >();
   readonly text = new Map<string, string>();
   readonly binary = new Map<string, ArrayBuffer>();
+  folderCreateError: Error | undefined;
 
   getAbstractFileByPath(path: string) {
     return this.entries.get(path) ?? null;
   }
 
   async createFolder(path: string) {
+    if (this.folderCreateError !== undefined) {
+      const error = this.folderCreateError;
+      this.folderCreateError = undefined;
+      this.entries.set(path, { path, children: [] });
+      throw error;
+    }
     const entry = { path, children: [] };
     this.entries.set(path, entry);
     return entry;
@@ -103,5 +110,19 @@ describe("NewFileExecutor", () => {
     }).execute([operation(remote("A.md", "longer"))]);
     expect(result.errors).toHaveLength(1);
     expect(vault.entries.has("A.md")).toBe(false);
+  });
+
+  it("accepts a folder created concurrently", async () => {
+    const vault = new MemoryVault();
+    vault.folderCreateError = new Error("Folder already exists.");
+    const file = remote("Folder/A.md", "hello");
+    const result = await new NewFileExecutor({
+      vault,
+      provider: provider("hello"),
+      concurrency: 2,
+      onCreated: async () => undefined,
+    }).execute([operation(file)]);
+    expect(result.status).toBe("completed");
+    expect(vault.text.get("Folder/A.md")).toBe("hello");
   });
 });
