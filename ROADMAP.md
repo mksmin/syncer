@@ -19,12 +19,12 @@ count; no local changes.
 Local index, filters, snapshot binding, comparator, real `SyncPlan`, dry-run modal, deletion
 thresholds and root/provider migration guard. Result: real plan, zero file changes.
 
-## v0.4.0 — create new local files (current)
+## v0.4.0 — create new local files (done)
 
 Bounded download queue, folders, text/binary Vault API, size/checksum verification, max size, retry,
 abort and partial result. Existing local files remain untouched.
 
-## v0.5.0 — update local files
+## v0.5.0 — update local files (current)
 
 Verified `UPDATE_LOCAL`, old-copy preservation on failure, per-file snapshot, result/progress modal,
 startup sync without trash.

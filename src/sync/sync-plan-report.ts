@@ -12,16 +12,16 @@ const SKIP_LABELS: Record<SkipReason, string> = {
   FILE_TOO_LARGE: "Превышен лимит размера",
   DELETION_DISABLED: "Удаление отключено",
   REMOTE_INDEX_INCOMPLETE: "Удаление заблокировано: индекс неполный",
-  REMOTE_ROOT_CHANGED: "Удаление заблокировано: новый root или нет snapshot",
-  UNSAFE_REMOTE_ROOT: "Удаление заблокировано: root недоступен",
+  REMOTE_ROOT_CHANGED: "Удаление недоступно до полной синхронизации этой папки",
+  UNSAFE_REMOTE_ROOT: "Удаление недоступно: папка на сервере не подтверждена",
 };
 
 export function buildPlanSections(plan: SyncPlan): SyncPlanSection[] {
   return [
-    section("Скачать новые", plan, "DOWNLOAD_NEW", "normal"),
-    section("Обновить локально", plan, "UPDATE_LOCAL", "warning"),
-    section("Переместить в корзину", plan, "TRASH_LOCAL", "warning"),
-    section("Пропустить", plan, "SKIP", "muted"),
+    section("Новые файлы", plan, "DOWNLOAD_NEW", "normal"),
+    section("Изменённые файлы", plan, "UPDATE_LOCAL", "warning"),
+    section("Удалить локально", plan, "TRASH_LOCAL", "warning"),
+    section("Оставить без изменений", plan, "SKIP", "muted"),
   ].filter((item) => item.operations.length > 0);
 }
 
@@ -33,15 +33,16 @@ export function operationDetail(operation: SyncOperation): string {
 
 export function deletionWarning(plan: SyncPlan): string | undefined {
   const assessment = plan.deletionAssessment;
+  if (assessment.deleteCount === 0) return undefined;
   if (!assessment.allowed) {
     const reason = assessment.blockedReason;
     const label =
       reason === "REMOTE_INDEX_INCOMPLETE"
-        ? "удалённый индекс неполный"
+        ? "список файлов с сервера получен не полностью"
         : reason === "UNSAFE_REMOTE_ROOT"
-          ? "удалённый root не подтверждён"
-          : "root новый или отсутствует доверенный snapshot";
-    return `Удаления заблокированы: ${label}. Кандидатов: ${String(assessment.deleteCount)}.`;
+          ? "папка на сервере недоступна"
+          : "сначала нужна полная успешная синхронизация выбранной папки";
+    return `Локальное удаление отключено: ${label}. Файлов: ${String(assessment.deleteCount)}.`;
   }
   if (!assessment.confirmationRequired) return undefined;
   return `Массовое удаление потребует подтверждения: ${String(assessment.deleteCount)} файлов (${formatPercentage(assessment.deletePercentage)}).`;

@@ -123,8 +123,36 @@ export class SyncerSettingTab extends PluginSettingTab {
 
     new Setting(this.containerEl).setName("Синхронизация").setHeading();
     new Setting(this.containerEl)
+      .setName("Синхронизировать при запуске")
+      .setDesc("После загрузки vault автоматически выполняет new/update. Удаления запрещены.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.syncOnStartup).onChange(async (value) => {
+          this.plugin.settings.syncOnStartup = value;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(this.containerEl)
+      .setName("Задержка запуска")
+      .setDesc("Пауза после готовности интерфейса Obsidian.")
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption("0", "Без задержки")
+          .addOption("5", "5 секунд")
+          .addOption("10", "10 секунд")
+          .addOption("15", "15 секунд")
+          .addOption("30", "30 секунд")
+          .addOption("60", "60 секунд")
+          .setValue(String(this.plugin.settings.startupDelaySeconds))
+          .onChange(async (value) => {
+            this.plugin.settings.startupDelaySeconds = Number.parseInt(value, 10);
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(this.containerEl)
       .setName("Удалять отсутствующие на сервере файлы")
-      .setDesc("В v0.4.0 удаления только показываются в плане и не выполняются.")
+      .setDesc("В v0.5.0 удаления только показываются в плане и не выполняются.")
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.deleteMissingLocalFiles).onChange(async (value) => {
           this.plugin.settings.deleteMissingLocalFiles = value;
@@ -149,7 +177,7 @@ export class SyncerSettingTab extends PluginSettingTab {
 
     new Setting(this.containerEl)
       .setName("Параллельные загрузки")
-      .setDesc("Подготовлено для download executor; диапазон 1–5.")
+      .setDesc("Одновременные download/update; диапазон 1–5.")
       .addDropdown((dropdown) => {
         dropdown
           .addOption("1", "1 файл")

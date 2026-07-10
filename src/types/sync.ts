@@ -78,6 +78,7 @@ export interface SyncPlannerInput {
   previousState: SyncState;
   remoteIndexComplete: boolean;
   remoteRootExists: boolean;
+  snapshotMatchesRoot: boolean;
   remoteRootChanged: boolean;
   deleteMissingLocalFiles: boolean;
   deletionSafety: DeletionSafetySettings;

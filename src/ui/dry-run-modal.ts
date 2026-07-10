@@ -7,14 +7,24 @@ import {
   operationDetail,
 } from "../sync/sync-plan-report";
 import type { SyncOperation, SyncPlan } from "../types/sync";
+import type { FileExecutionError } from "../types/execution";
 
 const MAX_VISIBLE_OPERATIONS = 200;
+
+export interface DryRunActions {
+  syncAll: () => void;
+  downloadNew: () => void;
+  updateExisting: () => void;
+}
 
 export class DryRunModal extends Modal {
   private plan: SyncPlan | undefined;
   private statusEl: HTMLElement | undefined;
   private progressEl: HTMLProgressElement | undefined;
   private planEl: HTMLElement | undefined;
+  private actionsEl: HTMLElement | undefined;
+  private resultEl: HTMLElement | undefined;
+  private actions: DryRunActions | undefined;
   private readonly sectionOpen = new Map<string, boolean>();
 
   constructor(app: App, plan?: SyncPlan) {
@@ -23,11 +33,11 @@ export class DryRunModal extends Modal {
   }
 
   override onOpen(): void {
-    this.setTitle("Предварительный план");
+    this.setTitle("План синхронизации");
     this.contentEl.addClass("syncer-dry-run-modal");
     this.contentEl.createDiv({
       cls: "syncer-dry-run-safety",
-      text: "Dry run: файлы vault не будут изменены.",
+      text: "Предпросмотр: файлы в хранилище пока не изменяются.",
     });
     const progress = this.contentEl.createDiv({ cls: "syncer-live-progress" });
     this.statusEl = progress.createDiv({
@@ -37,8 +47,11 @@ export class DryRunModal extends Modal {
     this.progressEl = progress.createEl("progress", { cls: "syncer-live-progress-bar" });
     this.progressEl.max = 1;
     this.progressEl.value = this.plan === undefined ? 0 : 1;
+    this.actionsEl = this.contentEl.createDiv({ cls: "syncer-plan-actions" });
     this.planEl = this.contentEl.createDiv({ cls: "syncer-live-plan" });
+    this.resultEl = this.contentEl.createDiv({ cls: "syncer-execution-result" });
     this.renderPlan();
+    this.renderActions();
   }
 
   setProgress(message: string, current?: number, total?: number): void {
@@ -58,10 +71,30 @@ export class DryRunModal extends Modal {
     if (complete) this.setProgress("План готов", 1, 1);
   }
 
+  setActions(actions: DryRunActions): void {
+    this.actions = actions;
+    this.renderActions();
+  }
+
   showError(message: string): void {
     this.statusEl?.setText(message);
     this.statusEl?.addClass("is-error");
     this.progressEl?.removeAttribute("value");
+  }
+
+  showExecutionErrors(errors: readonly FileExecutionError[]): void {
+    if (this.resultEl === undefined) return;
+    this.resultEl.empty();
+    if (errors.length === 0) return;
+    const details = this.resultEl.createEl("details", { cls: "syncer-plan-section is-warning" });
+    details.open = true;
+    details.createEl("summary", { text: `Ошибки: ${String(errors.length)}` });
+    const list = details.createDiv({ cls: "syncer-plan-list" });
+    for (const error of errors.slice(0, MAX_VISIBLE_OPERATIONS)) {
+      const row = list.createDiv({ cls: "syncer-plan-row" });
+      row.createDiv({ cls: "syncer-plan-path", text: error.relativePath });
+      row.createDiv({ cls: "syncer-plan-detail", text: error.message });
+    }
   }
 
   override onClose(): void {
@@ -69,6 +102,9 @@ export class DryRunModal extends Modal {
     this.statusEl = undefined;
     this.progressEl = undefined;
     this.planEl = undefined;
+    this.actionsEl = undefined;
+    this.resultEl = undefined;
+    this.actions = undefined;
   }
 
   private renderPlan(): void {
@@ -110,14 +146,49 @@ export class DryRunModal extends Modal {
 
   private renderSummary(parent: HTMLElement, plan: SyncPlan): void {
     const summary = parent.createDiv({ cls: "syncer-plan-summary" });
-    summaryCard(summary, "Remote", plan.remoteFileCount);
-    summaryCard(summary, "Local", plan.localFileCount);
-    summaryCard(summary, "Новые", plan.downloadCount);
-    summaryCard(summary, "Обновить", plan.updateCount);
-    summaryCard(summary, "В корзину", plan.trashCount);
-    summaryCard(summary, "Пропустить", plan.skipCount);
-    summaryCard(summary, "Скачать", formatBytes(plan.totalDownloadBytes));
+    summaryCard(summary, "На сервере", plan.remoteFileCount);
+    summaryCard(summary, "Локально", plan.localFileCount);
+    summaryCard(summary, "Новые файлы", plan.downloadCount);
+    summaryCard(summary, "Изменённые файлы", plan.updateCount);
+    summaryCard(summary, "Удалить локально", plan.trashCount);
+    summaryCard(summary, "Без действий", plan.skipCount);
+    summaryCard(summary, "Объём загрузки", formatBytes(plan.totalDownloadBytes));
   }
+
+  private renderActions(): void {
+    if (this.actionsEl === undefined) return;
+    this.actionsEl.empty();
+    if (this.actions === undefined || this.plan === undefined) return;
+    actionButton(
+      this.actionsEl,
+      "Синхронизировать всё",
+      this.actions.syncAll,
+      this.plan.downloadCount + this.plan.updateCount === 0,
+    );
+    actionButton(
+      this.actionsEl,
+      "Только новые файлы",
+      this.actions.downloadNew,
+      this.plan.downloadCount === 0,
+    );
+    actionButton(
+      this.actionsEl,
+      "Только обновления",
+      this.actions.updateExisting,
+      this.plan.updateCount === 0,
+    );
+  }
+}
+
+function actionButton(
+  parent: HTMLElement,
+  label: string,
+  onClick: () => void,
+  disabled: boolean,
+): void {
+  const button = parent.createEl("button", { text: label, cls: "syncer-plan-action" });
+  button.disabled = disabled;
+  button.addEventListener("click", onClick);
 }
 
 function summaryCard(parent: HTMLElement, label: string, value: number | string): void {

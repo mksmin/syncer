@@ -2,9 +2,9 @@
 
 ## Threat model
 
-Syncer читает remote files и в будущих версиях пишет/перемещает local files. Главные риски: stolen
-token, traversal outside vault, partial listing interpreted as deletion, corrupted download
-replacing good local data, secret leakage in diagnostics.
+Syncer читает remote files, создаёт и обновляет local files; перемещение в trash появится позже.
+Главные риски: stolen token, traversal outside vault, partial listing interpreted as deletion,
+corrupted download replacing good local data, secret leakage in diagnostics.
 
 ## Controls
 
@@ -12,11 +12,12 @@ replacing good local data, secret leakage in diagnostics.
 - normalized relative paths reject `.`/`..` and control characters;
 - incomplete/missing/changed remote root blocks trash;
 - mass deletion needs manual confirmation; trash occurs last through `FileManager.trashFile()`;
-- content verified in memory before future Vault write;
+- content verified in memory before every Vault write;
 - logger redacts token/auth/password/secret keys and never logs file content;
 - plugin data uses Obsidian `loadData()`/`saveData()`; `data.json` ignored by Git;
 - no client secret ships in plugin. OAuth uses confirmation-code flow with PKCE S256;
-- v0.4 может только создавать отсутствующие local files; overwrite/update/trash заблокированы;
+- v0.5 обновляет local file только при совпадении size/mtime с dry run, держит старые bytes в памяти
+  и восстанавливает их при ошибке записи; trash заблокирован;
 - cancellation is cooperative because Obsidian `requestUrl()` exposes no `AbortSignal`: Syncer
   ignores a late response and starts no following request.
 

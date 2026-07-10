@@ -1,9 +1,9 @@
 {
   "id": "syncer",
   "name": "Syncer",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "minAppVersion": "1.6.0",
-  "description": "Pull-only Yandex Disk mirror with verified new-file downloads.",
+  "description": "Pull-only Yandex Disk mirror with verified create and update.",
   "author": "mksmin",
   "isDesktopOnly": false
 }

@@ -36,6 +36,7 @@ function input(overrides: Partial<SyncPlannerInput> = {}): SyncPlannerInput {
     previousState: emptySyncState(),
     remoteIndexComplete: true,
     remoteRootExists: true,
+    snapshotMatchesRoot: true,
     remoteRootChanged: false,
     deleteMissingLocalFiles: true,
     deletionSafety,
@@ -149,10 +150,35 @@ describe("PullSyncPlanner", () => {
         remoteFiles: [remote("A.md")],
         localFiles: [local("A.md")],
         previousState,
+        snapshotMatchesRoot: false,
         remoteRootChanged: true,
       }),
     );
     expect(plan.operations[0]?.type).toBe("UPDATE_LOCAL");
+  });
+
+  it("reuses a bound file snapshot while deletion trust is absent", () => {
+    const state: SyncedFileState = {
+      relativePath: "A.md",
+      remoteSize: 10,
+      remoteModifiedAt: 100,
+      remoteRevision: "r1",
+      localSize: 10,
+      localModifiedAt: 100,
+      syncedAt: 50,
+    };
+    const previousState = { ...emptySyncState(), files: { "A.md": state } };
+    const plan = planner().createPlan(
+      input({
+        remoteFiles: [remote("A.md")],
+        localFiles: [local("A.md"), local("Old.md")],
+        previousState,
+        snapshotMatchesRoot: true,
+        remoteRootChanged: true,
+      }),
+    );
+    expect(plan.operations[0]).toMatchObject({ type: "SKIP", reason: "UNCHANGED" });
+    expect(plan.operations[1]).toMatchObject({ type: "SKIP", reason: "REMOTE_ROOT_CHANGED" });
   });
 
   it("requires confirmation above delete count", () => {

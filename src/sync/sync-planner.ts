@@ -79,7 +79,7 @@ export class PullSyncPlanner implements SyncPlanner {
     }
 
     if (remote !== undefined && local !== undefined) {
-      const previous = input.remoteRootChanged ? undefined : input.previousState.files[path];
+      const previous = input.snapshotMatchesRoot ? input.previousState.files[path] : undefined;
       return compareFile(remote, local, previous) === "same"
         ? skip(path, "UNCHANGED", remote, local)
         : { type: "UPDATE_LOCAL", relativePath: path, remoteFile: remote, localFile: local };

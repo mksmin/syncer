@@ -17,3 +17,10 @@ export interface NewFileExecutionResult {
   created: CreatedFileResult[];
   errors: FileExecutionError[];
 }
+
+export interface UpdateFileExecutionResult {
+  status: "completed" | "completed-with-errors" | "cancelled";
+  plannedCount: number;
+  updated: CreatedFileResult[];
+  errors: FileExecutionError[];
+}

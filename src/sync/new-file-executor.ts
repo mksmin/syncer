@@ -6,6 +6,7 @@ import { throwIfAborted } from "../utils/abort";
 import { normalizeRelativePath } from "../utils/paths";
 import { runBounded } from "./bounded-queue";
 import { verifyDownloadedContent } from "./content-integrity";
+import { decodeUtf8, isTextFile } from "./vault-content";
 
 interface VaultEntry {
   path: string;
@@ -125,18 +126,4 @@ export class NewFileExecutor {
 function parentPath(path: string): string {
   const separator = path.lastIndexOf("/");
   return separator < 0 ? "" : path.slice(0, separator);
-}
-
-function isTextFile(mimeType: string | undefined, path: string): boolean {
-  if (mimeType?.startsWith("text/") === true) return true;
-  if (mimeType === "application/json" || mimeType?.includes("xml") === true) return true;
-  return /\.(?:md|txt|json|css|js|ts|html?|xml|csv|ya?ml|svg)$/iu.test(path);
-}
-
-function decodeUtf8(content: ArrayBuffer, path: string): string {
-  try {
-    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(content);
-  } catch {
-    throw new IntegrityError(`Текстовый файл не является корректным UTF-8: ${path}`);
-  }
 }

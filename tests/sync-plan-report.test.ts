@@ -49,8 +49,8 @@ describe("sync plan report", () => {
       ],
     });
     expect(buildPlanSections(value).map((section) => section.title)).toEqual([
-      "Скачать новые",
-      "Пропустить",
+      "Новые файлы",
+      "Оставить без изменений",
     ]);
     const download = value.operations[0];
     const skip = value.operations[1];
@@ -71,7 +71,22 @@ describe("sync plan report", () => {
         percentageLimitExceeded: true,
       },
     });
-    expect(deletionWarning(value)).toContain("Кандидатов: 7");
+    expect(deletionWarning(value)).toContain("Файлов: 7");
+  });
+
+  it("hides deletion warning when there are no candidates", () => {
+    const value = plan({
+      deletionAssessment: {
+        allowed: false,
+        confirmationRequired: false,
+        blockedReason: "REMOTE_ROOT_CHANGED",
+        deleteCount: 0,
+        deletePercentage: 0,
+        countLimitExceeded: false,
+        percentageLimitExceeded: false,
+      },
+    });
+    expect(deletionWarning(value)).toBeUndefined();
   });
 
   it("formats byte sizes", () => {

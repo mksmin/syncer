@@ -65,9 +65,10 @@
 }
 
 .syncer-sensitive-data-warning {
-  background: var(--background-modifier-error-hover);
+  background: var(--background-secondary);
+  border: 1px solid var(--text-warning);
   border-radius: var(--radius-s);
-  color: var(--text-warning);
+  color: var(--text-normal);
   margin: var(--size-4-2) 0 var(--size-4-4);
   padding: var(--size-4-3);
 }
@@ -107,8 +108,20 @@
 }
 
 .syncer-dry-run-warning {
-  background: var(--background-modifier-error-hover);
-  color: var(--text-warning);
+  background: var(--background-secondary);
+  border: 1px solid var(--text-warning);
+  color: var(--text-normal);
+}
+
+.syncer-plan-actions {
+  display: grid;
+  gap: var(--size-4-2);
+  margin: var(--size-4-4) 0;
+}
+
+.syncer-plan-action {
+  min-height: var(--input-height);
+  width: 100%;
 }
 
 .syncer-plan-summary {

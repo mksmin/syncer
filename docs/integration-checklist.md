@@ -12,5 +12,6 @@
 
 v0.2 automates planner, Yandex pagination/recursion, typed HTTP errors, retry, cancellation, binary
 download transport and PKCE token flow. v0.3 adds strict persisted-state validation, exact snapshot
-binding and detailed mobile dry-run reports. v0.4 adds verified new-file creation, bounded
-concurrency, per-file snapshot and live batched progress; update/trash remain disabled.
+binding and detailed mobile dry-run reports. v0.4 adds verified new-file creation. v0.5 adds
+verified guarded update with restore, bounded concurrency, per-file snapshot, live progress/errors
+and opt-in startup new/update; trash remains disabled.

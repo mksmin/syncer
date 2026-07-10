@@ -1,4 +1,4 @@
-import { Notice, Plugin, setIcon } from "obsidian";
+import { Notice, Plugin, setIcon, TFile, type Vault } from "obsidian";
 import { YANDEX_CLIENT_ID } from "./constants";
 import { GlobPathFilter } from "./filters/path-filter";
 import { errorMessage } from "./infrastructure/errors";
@@ -11,11 +11,16 @@ import { YandexDiskProvider, type RemoteFolder } from "./providers/yandex/yandex
 import { migrateSettings } from "./settings/settings-migration";
 import { LocalVaultIndex } from "./sync/local-vault-index";
 import { NewFileExecutor } from "./sync/new-file-executor";
+import {
+  UpdateFileExecutor,
+  type UpdateFileVault,
+  type UpdateVaultFile,
+} from "./sync/update-file-executor";
 import { SyncProgressReporter } from "./sync/progress-reporter";
 import { migrateSyncPlan } from "./sync/sync-plan-storage";
 import { PullSyncPlanner } from "./sync/sync-planner";
 import { emptySyncState, isSnapshotBoundTo, migrateSyncState } from "./sync/sync-state-repository";
-import type { DownloadNewOperation, SyncPlan } from "./types/sync";
+import type { DownloadNewOperation, SyncPlan, UpdateLocalOperation } from "./types/sync";
 import type { CreatedFileResult } from "./types/execution";
 import type { RemoteFile } from "./types/remote";
 import type { SyncerSettings } from "./types/settings";
@@ -24,6 +29,17 @@ import { DryRunModal } from "./ui/dry-run-modal";
 import { ConfirmationModal } from "./ui/confirmation-modal";
 import { SyncerSettingTab } from "./ui/settings-tab";
 import { YandexFolderPickerModal } from "./ui/yandex-folder-picker-modal";
+
+const REMOTE_INDEX_CACHE_TTL_MS = 60_000;
+const SYNC_COOLDOWN_MS = 30_000;
+
+type PullSelection = "all" | "new" | "updates";
+
+interface RemoteIndexCache {
+  remoteRoot: string;
+  files: readonly RemoteFile[];
+  storedAt: number;
+}
 
 interface PluginData {
   settings: SyncerSettings;
@@ -42,6 +58,8 @@ export default class SyncerPlugin extends Plugin {
   private readonly httpTransport = new ObsidianHttpTransport();
   private authService: YandexAuthService | undefined;
   private snapshotSaveChain = Promise.resolve();
+  private remoteIndexCache: RemoteIndexCache | undefined;
+  private lastSyncFinishedAt = 0;
   readonly progress = new SyncProgressReporter();
 
   override async onload(): Promise<void> {
@@ -56,20 +74,20 @@ export default class SyncerPlugin extends Plugin {
     });
     this.addSettingTab(new SyncerSettingTab(this.app, this));
 
-    this.ribbonEl = this.addRibbonIcon("cloud-download", "Показать dry run", () => {
+    this.ribbonEl = this.addRibbonIcon("cloud-download", "Показать план синхронизации", () => {
       void this.showDryRun();
     });
     this.ribbonEl.addClass("syncer-ribbon");
 
     this.addCommand({
       id: "show-dry-run",
-      name: "Показать предварительный план",
+      name: "Показать план синхронизации",
       callback: () => void this.showDryRun(),
     });
     this.addCommand({
-      id: "sync-new-files",
-      name: "Скачать только новые файлы",
-      callback: () => void this.prepareNewFileSync(),
+      id: "sync-now",
+      name: "Синхронизировать сейчас",
+      callback: () => void this.preparePullSync(),
     });
     this.addCommand({
       id: "stop-sync",
@@ -93,6 +111,11 @@ export default class SyncerPlugin extends Plugin {
 
     this.app.workspace.onLayoutReady(() => {
       this.progress.report({ stage: "idle", current: 0, total: 0, message: "Ожидание" });
+      if (!this.settings.syncOnStartup) return;
+      const timeoutId = window.setTimeout(() => {
+        void this.preparePullSync(false);
+      }, this.settings.startupDelaySeconds * 1_000);
+      this.register(() => window.clearTimeout(timeoutId));
     });
   }
 
@@ -139,6 +162,7 @@ export default class SyncerPlugin extends Plugin {
     if (nextRoot !== normalizeRemoteRoot(this.settings.remoteRootPath)) {
       this.syncState = emptySyncState();
       this.lastPlan = undefined;
+      this.remoteIndexCache = undefined;
     }
     this.settings.remoteRootPath = nextRoot;
     await this.saveSettings();
@@ -200,21 +224,17 @@ export default class SyncerPlugin extends Plugin {
           previousState: this.syncState,
           remoteIndexComplete: complete,
           remoteRootExists: true,
-          remoteRootChanged: !snapshotBound,
+          snapshotMatchesRoot: snapshotBound,
+          remoteRootChanged: !snapshotBound || this.syncState.lastSuccessfulSyncAt === undefined,
           deleteMissingLocalFiles: this.settings.deleteMissingLocalFiles,
           deletionSafety: this.settings.deletionSafety,
           maxFileSizeBytes: this.settings.maxFileSizeBytes,
         });
-      const provider = this.createYandexProvider();
-      const remoteFiles = await provider.listFiles(
-        this.settings.remoteRootPath,
+      const remoteFiles = await this.listRemoteFiles(
+        remoteRoot,
         controller.signal,
-        (batch) => {
-          modal.setProgress(
-            `Получено файлов: ${String(batch.discoveredFileCount)}; папок в очереди: ${String(batch.pendingFolderCount)}`,
-          );
-          modal.updatePlan(createPlan(batch.files, false), false);
-        },
+        modal,
+        createPlan,
       );
       this.lastPlan = createPlan(remoteFiles, true);
       await this.savePluginData();
@@ -222,9 +242,10 @@ export default class SyncerPlugin extends Plugin {
         stage: "completed",
         current: this.lastPlan.operations.length,
         total: this.lastPlan.operations.length,
-        message: "Dry run завершён; файловые операции не выполнялись",
+        message: "План синхронизации готов; файлы не изменены",
       });
       modal.updatePlan(this.lastPlan, true);
+      this.setPlanActions(modal, this.lastPlan, remoteRoot);
     } catch (error: unknown) {
       if (controller.signal.aborted) return;
       this.logger.error("Dry run failed", { error });
@@ -232,7 +253,7 @@ export default class SyncerPlugin extends Plugin {
         stage: "failed",
         current: 0,
         total: 0,
-        message: "Dry run завершился ошибкой",
+        message: "Не удалось подготовить план синхронизации",
       });
       modal.showError(errorMessage(error));
       new Notice(error instanceof Error ? error.message : String(error));
@@ -243,7 +264,7 @@ export default class SyncerPlugin extends Plugin {
     }
   }
 
-  private async prepareNewFileSync(): Promise<void> {
+  private async preparePullSync(requireConfirmation = true): Promise<void> {
     if (this.planning) {
       new Notice(this.progress.getProgress().message);
       return;
@@ -252,20 +273,20 @@ export default class SyncerPlugin extends Plugin {
     modal.open();
     const plan = await this.preparePlanForExecution(modal);
     if (plan === undefined) return;
-    const operations = downloadOperations(plan);
-    if (operations.length === 0) {
-      modal.setProgress("Новых файлов для скачивания нет", 1, 1);
-      new Notice("Новых файлов для скачивания нет. Existing files не изменены.");
+    const downloads = downloadOperations(plan);
+    const updates = updateOperations(plan);
+    if (downloads.length === 0 && updates.length === 0) {
+      modal.setProgress("Новых и изменённых файлов нет", 1, 1);
+      new Notice("Новых и изменённых файлов нет.");
       return;
     }
     const root = normalizeRemoteRoot(this.settings.remoteRootPath);
-    new ConfirmationModal(
-      this.app,
-      "Скачать новые файлы?",
-      `Будет создано ${String(operations.length)} новых файлов. Существующие файлы не перезаписываются, удаления не выполняются.`,
-      "Скачать новые",
-      () => this.executeNewFiles(operations, root, modal),
-    ).open();
+    this.setPlanActions(modal, plan, root);
+    if (!requireConfirmation) {
+      await this.executePullSync(downloads, updates, root, modal);
+      return;
+    }
+    this.confirmPlanExecution(plan, "all", modal, root);
   }
 
   private async preparePlanForExecution(modal: DryRunModal): Promise<SyncPlan | undefined> {
@@ -285,18 +306,17 @@ export default class SyncerPlugin extends Plugin {
           previousState: this.syncState,
           remoteIndexComplete: complete,
           remoteRootExists: true,
-          remoteRootChanged: !snapshotBound,
+          snapshotMatchesRoot: snapshotBound,
+          remoteRootChanged: !snapshotBound || this.syncState.lastSuccessfulSyncAt === undefined,
           deleteMissingLocalFiles: this.settings.deleteMissingLocalFiles,
           deletionSafety: this.settings.deletionSafety,
           maxFileSizeBytes: this.settings.maxFileSizeBytes,
         });
-      const remoteFiles = await this.createYandexProvider().listFiles(
-        this.settings.remoteRootPath,
+      const remoteFiles = await this.listRemoteFiles(
+        remoteRoot,
         controller.signal,
-        (batch) => {
-          modal.setProgress(`Получено файлов: ${String(batch.discoveredFileCount)}`);
-          modal.updatePlan(createPlan(batch.files, false), false);
-        },
+        modal,
+        createPlan,
       );
       const plan = createPlan(remoteFiles, true);
       modal.updatePlan(plan, true);
@@ -316,8 +336,9 @@ export default class SyncerPlugin extends Plugin {
     }
   }
 
-  private async executeNewFiles(
-    operations: readonly DownloadNewOperation[],
+  private async executePullSync(
+    downloads: readonly DownloadNewOperation[],
+    updates: readonly UpdateLocalOperation[],
     remoteRoot: string,
     modal: DryRunModal,
   ): Promise<void> {
@@ -325,44 +346,87 @@ export default class SyncerPlugin extends Plugin {
       new Notice("Удалённый root изменился. Сначала создайте новый dry run.");
       return;
     }
+    const cooldownRemaining = SYNC_COOLDOWN_MS - (Date.now() - this.lastSyncFinishedAt);
+    if (cooldownRemaining > 0) {
+      const seconds = Math.ceil(cooldownRemaining / 1_000);
+      const message = `Синхронизация только что завершилась. Повторная проверка доступна через ${String(seconds)} сек.`;
+      modal.setProgress(message, 1, 1);
+      new Notice(message);
+      return;
+    }
     this.planning = true;
     const controller = new AbortController();
     this.abortController = controller;
     this.setRibbonRunning(true);
-    modal.setProgress("Начало скачивания…", 0, operations.length);
+    const total = downloads.length + updates.length;
+    modal.setProgress("Начало синхронизации…", 0, total);
     try {
+      const provider = this.createYandexProvider();
       const executor = new NewFileExecutor({
         vault: this.app.vault,
-        provider: this.createYandexProvider(),
+        provider,
         concurrency: this.settings.concurrentDownloads,
         onCreated: (result) => this.recordCreatedFile(result, remoteRoot),
-        onProgress: (completed, total, currentPath) => {
+        onProgress: (completed, _downloadTotal, currentPath) => {
           modal.setProgress(
-            `Скачивание ${String(completed)}/${String(total)}: ${currentPath}`,
+            `Новые ${String(completed)}/${String(downloads.length)}: ${currentPath}`,
             completed,
             total,
           );
         },
       });
-      const result = await executor.execute(operations, controller.signal);
+      const newResult = await executor.execute(downloads, controller.signal);
+      const updateResult =
+        newResult.status === "cancelled"
+          ? { status: "cancelled" as const, plannedCount: updates.length, updated: [], errors: [] }
+          : await new UpdateFileExecutor({
+              vault: createUpdateFileVault(this.app.vault),
+              provider,
+              concurrency: this.settings.concurrentDownloads,
+              onUpdated: (result) => this.recordCreatedFile(result, remoteRoot),
+              onProgress: (completed, _updateTotal, currentPath) => {
+                modal.setProgress(
+                  `Обновление ${String(completed)}/${String(updates.length)}: ${currentPath}`,
+                  downloads.length + completed,
+                  total,
+                );
+              },
+            }).execute(updates, controller.signal);
+      const errors = [...newResult.errors, ...updateResult.errors];
+      const status =
+        newResult.status === "cancelled" || updateResult.status === "cancelled"
+          ? "cancelled"
+          : errors.length > 0
+            ? "completed-with-errors"
+            : "completed";
       this.progress.report({
-        stage: result.status === "cancelled" ? "cancelled" : result.status,
-        current: result.created.length,
-        total: result.plannedCount,
-        message: `Создано ${String(result.created.length)} из ${String(result.plannedCount)}; ошибок ${String(result.errors.length)}`,
+        stage: status,
+        current: newResult.created.length + updateResult.updated.length,
+        total,
+        message: `Создано ${String(newResult.created.length)}; обновлено ${String(updateResult.updated.length)}; ошибок ${String(errors.length)}`,
       });
       new Notice(
-        `Новые файлы: создано ${String(result.created.length)}, ошибок ${String(result.errors.length)}. Existing files не изменены.`,
+        `Создано ${String(newResult.created.length)}, обновлено ${String(updateResult.updated.length)}, ошибок ${String(errors.length)}. Удаления не выполнялись.`,
         10_000,
       );
       modal.setProgress(
-        result.status === "cancelled"
+        status === "cancelled"
           ? "Синхронизация остановлена"
-          : `Готово: ${String(result.created.length)}; ошибок ${String(result.errors.length)}`,
-        result.created.length + result.errors.length,
-        result.plannedCount,
+          : `Готово: новых ${String(newResult.created.length)}, обновлено ${String(updateResult.updated.length)}, ошибок ${String(errors.length)}`,
+        total,
+        total,
       );
+      modal.showExecutionErrors(errors);
+    } catch (error: unknown) {
+      if (!controller.signal.aborted) {
+        const message = errorMessage(error);
+        this.logger.error("Pull sync failed", { error });
+        this.progress.report({ stage: "failed", current: 0, total, message });
+        modal.showError(message);
+        new Notice(message, 10_000);
+      }
     } finally {
+      this.lastSyncFinishedAt = Date.now();
       this.planning = false;
       this.abortController = undefined;
       this.setRibbonRunning(false);
@@ -394,10 +458,84 @@ export default class SyncerPlugin extends Plugin {
     new DryRunModal(this.app, this.lastPlan).open();
   }
 
+  private setPlanActions(modal: DryRunModal, plan: SyncPlan, remoteRoot: string): void {
+    modal.setActions({
+      syncAll: () => this.confirmPlanExecution(plan, "all", modal, remoteRoot),
+      downloadNew: () => this.confirmPlanExecution(plan, "new", modal, remoteRoot),
+      updateExisting: () => this.confirmPlanExecution(plan, "updates", modal, remoteRoot),
+    });
+  }
+
+  private confirmPlanExecution(
+    plan: SyncPlan,
+    selection: PullSelection,
+    modal: DryRunModal,
+    remoteRoot: string,
+  ): void {
+    if (this.planning) {
+      new Notice(this.progress.getProgress().message);
+      return;
+    }
+    const downloads = selection === "updates" ? [] : downloadOperations(plan);
+    const updates = selection === "new" ? [] : updateOperations(plan);
+    if (downloads.length === 0 && updates.length === 0) {
+      new Notice("Для выбранного действия нет файлов.");
+      return;
+    }
+    const title =
+      selection === "new"
+        ? "Скачать новые файлы?"
+        : selection === "updates"
+          ? "Обновить изменённые файлы?"
+          : "Синхронизировать все изменения?";
+    const confirmLabel =
+      selection === "new"
+        ? "Скачать новые"
+        : selection === "updates"
+          ? "Обновить файлы"
+          : "Синхронизировать всё";
+    new ConfirmationModal(
+      this.app,
+      title,
+      `Новых файлов: ${String(downloads.length)}. Изменённых файлов: ${String(updates.length)}. Удаления не выполняются.`,
+      confirmLabel,
+      () => this.executePullSync(downloads, updates, remoteRoot, modal),
+    ).open();
+  }
+
+  private async listRemoteFiles(
+    remoteRoot: string,
+    signal: AbortSignal,
+    modal: DryRunModal,
+    createPlan: (files: readonly RemoteFile[], complete: boolean) => SyncPlan,
+  ): Promise<RemoteFile[]> {
+    const cache = this.remoteIndexCache;
+    if (
+      cache?.remoteRoot === remoteRoot &&
+      Date.now() - cache.storedAt < REMOTE_INDEX_CACHE_TTL_MS
+    ) {
+      const files = [...cache.files];
+      modal.setProgress("Использован свежий список файлов из кэша", 1, 1);
+      modal.updatePlan(createPlan(files, true), true);
+      return files;
+    }
+    const files = await this.createYandexProvider().listFiles(remoteRoot, signal, (batch) => {
+      modal.setProgress(
+        `Получено файлов: ${String(batch.discoveredFileCount)}; папок в очереди: ${String(batch.pendingFolderCount)}`,
+      );
+      modal.updatePlan(createPlan(batch.files, false), false);
+    });
+    this.remoteIndexCache = { remoteRoot, files: [...files], storedAt: Date.now() };
+    return files;
+  }
+
   private setRibbonRunning(running: boolean): void {
     if (this.ribbonEl === undefined) return;
     this.ribbonEl.toggleClass("is-planning", running);
-    this.ribbonEl.setAttribute("aria-label", running ? "Подготовка dry run…" : "Показать dry run");
+    this.ribbonEl.setAttribute(
+      "aria-label",
+      running ? "Подготовка плана синхронизации…" : "Показать план синхронизации",
+    );
     setIcon(this.ribbonEl, running ? "loader-circle" : "cloud-download");
   }
 
@@ -452,4 +590,27 @@ function downloadOperations(plan: SyncPlan): DownloadNewOperation[] {
   return plan.operations.filter(
     (operation): operation is DownloadNewOperation => operation.type === "DOWNLOAD_NEW",
   );
+}
+
+function updateOperations(plan: SyncPlan): UpdateLocalOperation[] {
+  return plan.operations.filter(
+    (operation): operation is UpdateLocalOperation => operation.type === "UPDATE_LOCAL",
+  );
+}
+
+function createUpdateFileVault(vault: Vault): UpdateFileVault {
+  const findTFile = (file: UpdateVaultFile): TFile => {
+    const entry = vault.getAbstractFileByPath(file.path);
+    if (!(entry instanceof TFile)) throw new Error(`Локальный файл не найден: ${file.path}`);
+    return entry;
+  };
+  return {
+    getAbstractFileByPath: (path) => {
+      const entry = vault.getAbstractFileByPath(path);
+      return entry instanceof TFile ? entry : null;
+    },
+    readBinary: (file) => vault.readBinary(findTFile(file)),
+    modify: (file, data) => vault.modify(findTFile(file), data),
+    modifyBinary: (file, data) => vault.modifyBinary(findTFile(file), data),
+  };
 }

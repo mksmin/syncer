@@ -1,14 +1,14 @@
 # Syncer architecture
 
 Syncer — pull-only зеркало: remote storage является источником истины, локальный Obsidian vault —
-читаемой копией. v0.4.0 читает реальные remote/local индексы, показывает live plan батчами и может
-создавать только отсутствующие локальные файлы. Update и trash ещё не выполняются.
+читаемой копией. v0.5.0 читает реальные remote/local индексы, показывает live plan батчами, создаёт
+отсутствующие и безопасно обновляет существующие локальные файлы. Trash ещё не выполняется.
 
 ## Поток данных
 
 ```text
 RemoteStorageProvider -> RemoteFile[] --+
-                                        +-> PullSyncPlanner -> SyncPlan -> future SyncExecutor
+                                        +-> PullSyncPlanner -> SyncPlan -> create/update executors
 Vault -> LocalVaultIndex -> LocalFile[] -+                         |
 SyncStateRepository -> previous snapshot --------------------------+
 PathFilter + deletion settings ------------------------------------+
@@ -61,9 +61,9 @@ Logger получает только metadata и редактирует ключ
 
 ## Lifecycle
 
-`onload`: migrate data, initialize OAuth transport, register settings/ribbon/commands. Startup sync
-в будущей версии запускается только внутри `workspace.onLayoutReady()` с delay и session lock.
-`onunload`: abort и provider dispose.
+`onload`: migrate data, initialize OAuth transport, register settings/ribbon/commands. Opt-in
+startup sync запускается только внутри `workspace.onLayoutReady()` с delay и session lock; в v0.5 он
+выполняет new/update без trash. `onunload`: abort и provider dispose.
 
 ## WebDAV extension
 
