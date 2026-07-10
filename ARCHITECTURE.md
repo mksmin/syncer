@@ -1,14 +1,14 @@
 # Syncer architecture
 
 Syncer — pull-only зеркало: remote storage является источником истины, локальный Obsidian vault —
-читаемой копией. v0.5.0 читает реальные remote/local индексы, показывает live plan батчами, создаёт
-отсутствующие и безопасно обновляет существующие локальные файлы. Trash ещё не выполняется.
+читаемой копией. v0.6.0 читает реальные remote/local индексы, показывает live plan батчами, создаёт,
+обновляет и через ручное подтверждение перемещает local-only files в корзину Obsidian.
 
 ## Поток данных
 
 ```text
 RemoteStorageProvider -> RemoteFile[] --+
-                                        +-> PullSyncPlanner -> SyncPlan -> create/update executors
+                                        +-> PullSyncPlanner -> SyncPlan -> create/update/trash executors
 Vault -> LocalVaultIndex -> LocalFile[] -+                         |
 SyncStateRepository -> previous snapshot --------------------------+
 PathFilter + deletion settings ------------------------------------+
@@ -35,9 +35,12 @@ provider регистрируется без изменения planner/executor
 4. Исключённый путь не download/update/trash.
 5. Неоднозначное равенство означает update; snapshot fast path допустим только при stable local
    stat.
-6. Executor сначала скачивает/проверяет, затем пишет; trash выполняется последним.
+6. Executor сначала скачивает/проверяет, затем пишет; trash выполняется последним и только если все
+   download/update завершены без ошибок.
 7. Snapshot обновляется per successful operation; global success — только без partial failure.
-8. Одна session; `AbortController` останавливает новые операции и будущие удаления.
+8. Одна session; `AbortController` останавливает новые операции и следующий trash file.
+9. Startup/background session никогда не получает `TRASH_LOCAL`; только ручной plan может передать
+   trash executor после отдельного выбора пользователя.
 
 ## Состояния
 

@@ -24,3 +24,10 @@ export interface UpdateFileExecutionResult {
   updated: CreatedFileResult[];
   errors: FileExecutionError[];
 }
+
+export interface TrashFileExecutionResult {
+  status: "completed" | "completed-with-errors" | "cancelled";
+  plannedCount: number;
+  trashed: string[];
+  errors: FileExecutionError[];
+}

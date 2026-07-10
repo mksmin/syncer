@@ -24,15 +24,16 @@ thresholds and root/provider migration guard. Result: real plan, zero file chang
 Bounded download queue, folders, text/binary Vault API, size/checksum verification, max size, retry,
 abort and partial result. Existing local files remain untouched.
 
-## v0.5.0 — update local files (current)
+## v0.5.0 — update local files (done)
 
 Verified `UPDATE_LOCAL`, old-copy preservation on failure, per-file snapshot, result/progress modal,
 startup/background sync rule without trash, separate planned sync UI and file difference details.
 
-## v0.6.0 — safe trash
+## v0.6.0 — safe trash (current)
 
-`TRASH_LOCAL` via `FileManager.trashFile()`, last-stage deletion, completeness/root guards, count
-and percentage confirmation, startup defer, mass-delete tests.
+`TRASH_LOCAL` via `FileManager.trashFile()`, last-stage deletion, completeness/root/baseline guards,
+count and percentage confirmation, explicit without-trash choice, startup prohibition and
+mass-delete tests.
 
 ## v0.7.0 — settings and UX
 

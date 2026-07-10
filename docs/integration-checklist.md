@@ -13,9 +13,14 @@
   both execute without opening a modal.
 - Open planned sync during background work: same session/progress opens; no second listing/executor.
 - Update rows explain size delta and remote/local modification dates.
+- First complete all-sync after root change establishes baseline but performs zero trash; second
+  plan may offer trash.
+- Download/update error or cancellation: zero trash calls. Local stat change after plan: that file
+  remains and result contains error.
 
 v0.2 automates planner, Yandex pagination/recursion, typed HTTP errors, retry, cancellation, binary
 download transport and PKCE token flow. v0.3 adds strict persisted-state validation, exact snapshot
 binding and detailed mobile dry-run reports. v0.4 adds verified new-file creation. v0.5 adds
 verified guarded update with restore, bounded concurrency, per-file snapshot, live progress/errors
-and opt-in startup new/update; trash remains disabled.
+and opt-in startup new/update. v0.6 adds baseline-guarded manual Obsidian trash; background trash
+remains prohibited.

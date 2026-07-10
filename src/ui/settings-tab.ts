@@ -168,7 +168,7 @@ export class SyncerSettingTab extends PluginSettingTab {
 
     new Setting(this.containerEl)
       .setName("Удалять отсутствующие на сервере файлы")
-      .setDesc("В текущей версии удаления только показываются в плане и не выполняются.")
+      .setDesc("Только ручной план: через корзину, после baseline и отдельного подтверждения.")
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.deleteMissingLocalFiles).onChange(async (value) => {
           this.plugin.settings.deleteMissingLocalFiles = value;

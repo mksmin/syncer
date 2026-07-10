@@ -1,4 +1,4 @@
-import { Notice, Plugin, setIcon, TFile, type Vault } from "obsidian";
+import { Notice, Plugin, setIcon, TFile, type FileManager, type Vault } from "obsidian";
 import { YANDEX_CLIENT_ID } from "./constants";
 import { GlobPathFilter } from "./filters/path-filter";
 import { errorMessage } from "./infrastructure/errors";
@@ -21,7 +21,18 @@ import { selectPullOperations, type PullSelection } from "./sync/sync-operation-
 import { migrateSyncPlan } from "./sync/sync-plan-storage";
 import { PullSyncPlanner } from "./sync/sync-planner";
 import { emptySyncState, isSnapshotBoundTo, migrateSyncState } from "./sync/sync-state-repository";
-import type { DownloadNewOperation, SyncPlan, UpdateLocalOperation } from "./types/sync";
+import {
+  TrashFileExecutor,
+  type LocalTrashManager,
+  type TrashFileVault,
+  type TrashVaultFile,
+} from "./sync/trash-file-executor";
+import type {
+  DownloadNewOperation,
+  SyncPlan,
+  TrashLocalOperation,
+  UpdateLocalOperation,
+} from "./types/sync";
 import type { CreatedFileResult } from "./types/execution";
 import type { RemoteFile } from "./types/remote";
 import type { SyncerSettings } from "./types/settings";
@@ -29,6 +40,7 @@ import type { SyncState } from "./types/state";
 import { DryRunModal } from "./ui/dry-run-modal";
 import { ConfirmationModal } from "./ui/confirmation-modal";
 import { SyncerSettingTab } from "./ui/settings-tab";
+import { SyncConfirmationModal } from "./ui/sync-confirmation-modal";
 import { YandexFolderPickerModal } from "./ui/yandex-folder-picker-modal";
 
 const REMOTE_INDEX_CACHE_TTL_MS = 60_000;
@@ -38,6 +50,12 @@ interface RemoteIndexCache {
   remoteRoot: string;
   files: readonly RemoteFile[];
   storedAt: number;
+}
+
+interface PullExecutionOptions {
+  background?: boolean;
+  showCompletionNotice?: boolean;
+  establishDeletionTrust?: boolean;
 }
 
 interface PluginData {
@@ -282,18 +300,20 @@ export default class SyncerPlugin extends Plugin {
     const plan = await this.preparePlanForExecution(modal);
     if (plan === undefined) return;
     const { downloads, updates } = selectPullOperations(plan, this.settings.backgroundSyncMode);
+    const root = normalizeRemoteRoot(this.settings.remoteRootPath);
     if (downloads.length === 0 && updates.length === 0) {
       modal.setProgress("По правилу фоновой синхронизации изменений нет", 1, 1);
       this.lastSessionModal = modal;
+      if (this.settings.backgroundSyncMode === "all") await this.markSyncSuccessful(root);
       if (source === "manual" && this.settings.showNotice) {
         new Notice("Фоновая синхронизация: изменений нет.");
       }
       return;
     }
-    const root = normalizeRemoteRoot(this.settings.remoteRootPath);
-    await this.executePullSync(downloads, updates, root, modal, {
+    await this.executePullSync(downloads, updates, [], root, modal, {
       background: true,
       showCompletionNotice: source === "manual" && this.settings.showNotice,
+      establishDeletionTrust: this.settings.backgroundSyncMode === "all",
     });
   }
 
@@ -354,9 +374,10 @@ export default class SyncerPlugin extends Plugin {
   private async executePullSync(
     downloads: readonly DownloadNewOperation[],
     updates: readonly UpdateLocalOperation[],
+    trash: readonly TrashLocalOperation[],
     remoteRoot: string,
     modal: DryRunModal,
-    options: { background?: boolean; showCompletionNotice?: boolean } = {},
+    options: PullExecutionOptions = {},
   ): Promise<void> {
     if (normalizeRemoteRoot(this.settings.remoteRootPath) !== remoteRoot) {
       new Notice("Удалённый root изменился. Сначала создайте новый dry run.");
@@ -381,8 +402,9 @@ export default class SyncerPlugin extends Plugin {
         : "Синхронизация выполняется…",
     );
     this.lastSessionModal = modal;
-    const total = downloads.length + updates.length;
-    modal.setProgress("Начало синхронизации…", 0, total);
+    const total = downloads.length + updates.length + trash.length;
+    const progressTotal = Math.max(total, 1);
+    modal.setProgress("Начало синхронизации…", 0, progressTotal);
     try {
       const provider = this.createYandexProvider();
       const executor = new NewFileExecutor({
@@ -394,7 +416,7 @@ export default class SyncerPlugin extends Plugin {
           modal.setProgress(
             `Новые ${String(completed)}/${String(downloads.length)}: ${currentPath}`,
             completed,
-            total,
+            progressTotal,
           );
         },
       });
@@ -411,35 +433,72 @@ export default class SyncerPlugin extends Plugin {
                 modal.setProgress(
                   `Обновление ${String(completed)}/${String(updates.length)}: ${currentPath}`,
                   downloads.length + completed,
-                  total,
+                  progressTotal,
                 );
               },
             }).execute(updates, controller.signal);
       const errors = [...newResult.errors, ...updateResult.errors];
+      let trashed: string[] = [];
+      let trashStatus: "completed" | "completed-with-errors" | "cancelled" = "completed";
+      const pullCompleted = newResult.status === "completed" && updateResult.status === "completed";
+      if (trash.length > 0 && pullCompleted) {
+        this.progress.report({
+          stage: "trashing",
+          current: downloads.length + updates.length,
+          total,
+          message: `Перемещение в корзину: ${String(trash.length)} файлов`,
+        });
+        const trashAdapter = createTrashAdapter(this.app.vault, this.app.fileManager);
+        const trashResult = await new TrashFileExecutor({
+          vault: trashAdapter,
+          fileManager: trashAdapter,
+          onTrashed: (path) => this.recordTrashedFile(path),
+          onProgress: (completed, _trashTotal, currentPath) => {
+            modal.setProgress(
+              `В корзину ${String(completed)}/${String(trash.length)}: ${currentPath}`,
+              downloads.length + updates.length + completed,
+              progressTotal,
+            );
+          },
+        }).execute(trash, controller.signal);
+        trashed = trashResult.trashed;
+        trashStatus = trashResult.status;
+        errors.push(...trashResult.errors);
+      } else if (trash.length > 0 && !controller.signal.aborted) {
+        errors.push({
+          relativePath: "Локальные удаления",
+          message: "Перемещение в корзину не выполнялось из-за ошибок загрузки или обновления.",
+        });
+      }
       const status =
-        newResult.status === "cancelled" || updateResult.status === "cancelled"
+        newResult.status === "cancelled" ||
+        updateResult.status === "cancelled" ||
+        trashStatus === "cancelled"
           ? "cancelled"
           : errors.length > 0
             ? "completed-with-errors"
             : "completed";
+      if (status === "completed" && options.establishDeletionTrust === true) {
+        await this.markSyncSuccessful(remoteRoot);
+      }
       this.progress.report({
         stage: status,
-        current: newResult.created.length + updateResult.updated.length,
+        current: newResult.created.length + updateResult.updated.length + trashed.length,
         total,
-        message: `Создано ${String(newResult.created.length)}; обновлено ${String(updateResult.updated.length)}; ошибок ${String(errors.length)}`,
+        message: `Создано ${String(newResult.created.length)}; обновлено ${String(updateResult.updated.length)}; в корзине ${String(trashed.length)}; ошибок ${String(errors.length)}`,
       });
       if (options.showCompletionNotice ?? this.settings.showNotice) {
         new Notice(
-          `Создано ${String(newResult.created.length)}, обновлено ${String(updateResult.updated.length)}, ошибок ${String(errors.length)}. Удаления не выполнялись.`,
+          `Создано ${String(newResult.created.length)}, обновлено ${String(updateResult.updated.length)}, в корзине ${String(trashed.length)}, ошибок ${String(errors.length)}.`,
           10_000,
         );
       }
       modal.setProgress(
         status === "cancelled"
           ? "Синхронизация остановлена"
-          : `Готово: новых ${String(newResult.created.length)}, обновлено ${String(updateResult.updated.length)}, ошибок ${String(errors.length)}`,
-        total,
-        total,
+          : `Готово: новых ${String(newResult.created.length)}, обновлено ${String(updateResult.updated.length)}, в корзине ${String(trashed.length)}, ошибок ${String(errors.length)}`,
+        progressTotal,
+        progressTotal,
       );
       modal.showExecutionErrors(errors);
     } catch (error: unknown) {
@@ -479,6 +538,23 @@ export default class SyncerPlugin extends Plugin {
     await this.saveSettings();
   }
 
+  private async recordTrashedFile(relativePath: string): Promise<void> {
+    this.syncState.files = Object.fromEntries(
+      Object.entries(this.syncState.files).filter(([path]) => path !== relativePath),
+    );
+    await this.saveSettings();
+  }
+
+  private async markSyncSuccessful(remoteRoot: string): Promise<void> {
+    if (normalizeRemoteRoot(this.settings.remoteRootPath) !== remoteRoot) {
+      throw new Error("Удалённый root изменился во время синхронизации.");
+    }
+    this.syncState.providerType = "yandex-disk";
+    this.syncState.remoteRootPath = remoteRoot;
+    this.syncState.lastSuccessfulSyncAt = Date.now();
+    await this.saveSettings();
+  }
+
   private showLastPlan(): void {
     if (this.activeModal !== undefined) {
       this.reopenActiveOperation();
@@ -514,8 +590,33 @@ export default class SyncerPlugin extends Plugin {
       return;
     }
     const { downloads, updates } = selectPullOperations(plan, selection);
-    if (downloads.length === 0 && updates.length === 0) {
+    const trash = selection === "all" ? trashOperations(plan) : [];
+    const canEstablishBaseline = selection === "all" && plan.deletionAssessment.deleteCount > 0;
+    if (
+      downloads.length === 0 &&
+      updates.length === 0 &&
+      trash.length === 0 &&
+      !canEstablishBaseline
+    ) {
       new Notice("Для выбранного действия нет файлов.");
+      return;
+    }
+    if (trash.length > 0) {
+      new SyncConfirmationModal(this.app, {
+        downloadCount: downloads.length,
+        updateCount: updates.length,
+        trashCount: trash.length,
+        trashPaths: trash.map((operation) => operation.relativePath),
+        deletionAssessment: plan.deletionAssessment,
+        onWithoutTrash: () =>
+          this.executePullSync(downloads, updates, [], remoteRoot, modal, {
+            establishDeletionTrust: true,
+          }),
+        onWithTrash: () =>
+          this.executePullSync(downloads, updates, trash, remoteRoot, modal, {
+            establishDeletionTrust: true,
+          }),
+      }).open();
       return;
     }
     const title =
@@ -533,9 +634,14 @@ export default class SyncerPlugin extends Plugin {
     new ConfirmationModal(
       this.app,
       title,
-      `Новых файлов: ${String(downloads.length)}. Изменённых файлов: ${String(updates.length)}. Удаления не выполняются.`,
+      canEstablishBaseline && downloads.length === 0 && updates.length === 0
+        ? "Файлов для загрузки нет. Полный индекс будет подтверждён; удаления станут доступны только в следующем плане."
+        : `Новых файлов: ${String(downloads.length)}. Изменённых файлов: ${String(updates.length)}. Удалений: 0.`,
       confirmLabel,
-      () => this.executePullSync(downloads, updates, remoteRoot, modal),
+      () =>
+        this.executePullSync(downloads, updates, [], remoteRoot, modal, {
+          establishDeletionTrust: selection === "all",
+        }),
     ).open();
   }
 
@@ -640,6 +746,12 @@ function asPluginData(value: unknown): Partial<PluginData> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value : undefined;
 }
 
+function trashOperations(plan: SyncPlan): TrashLocalOperation[] {
+  return plan.operations.filter(
+    (operation): operation is TrashLocalOperation => operation.type === "TRASH_LOCAL",
+  );
+}
+
 function createUpdateFileVault(vault: Vault): UpdateFileVault {
   const findTFile = (file: UpdateVaultFile): TFile => {
     const entry = vault.getAbstractFileByPath(file.path);
@@ -654,5 +766,23 @@ function createUpdateFileVault(vault: Vault): UpdateFileVault {
     readBinary: (file) => vault.readBinary(findTFile(file)),
     modify: (file, data) => vault.modify(findTFile(file), data),
     modifyBinary: (file, data) => vault.modifyBinary(findTFile(file), data),
+  };
+}
+
+function createTrashAdapter(
+  vault: Vault,
+  fileManager: FileManager,
+): TrashFileVault & LocalTrashManager {
+  const findTFile = (file: TrashVaultFile): TFile => {
+    const entry = vault.getAbstractFileByPath(file.path);
+    if (!(entry instanceof TFile)) throw new Error(`Локальный файл не найден: ${file.path}`);
+    return entry;
+  };
+  return {
+    getAbstractFileByPath: (path) => {
+      const entry = vault.getAbstractFileByPath(path);
+      return entry instanceof TFile ? entry : null;
+    },
+    trashFile: (file) => fileManager.trashFile(findTFile(file)),
   };
 }

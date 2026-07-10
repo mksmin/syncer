@@ -16,8 +16,10 @@ corrupted download replacing good local data, secret leakage in diagnostics.
 - logger redacts token/auth/password/secret keys and never logs file content;
 - plugin data uses Obsidian `loadData()`/`saveData()`; `data.json` ignored by Git;
 - no client secret ships in plugin. OAuth uses confirmation-code flow with PKCE S256;
-- v0.5 обновляет local file только при совпадении size/mtime с dry run, держит старые bytes в памяти
-  и восстанавливает их при ошибке записи; trash заблокирован;
+- v0.6 обновляет или перемещает local file в корзину только при совпадении size/mtime с планом;
+  update держит старые bytes в памяти и восстанавливает их при ошибке записи;
+- trash доступен только в ручной плановой сессии, после trusted baseline и успешных download/update;
+  startup/background никогда не передаёт trash operations executor;
 - binary downloads читаются только как `ArrayBuffer`; transport не запускает JSON parser для
   содержимого заметок, изображений, PDF и других файлов;
 - cancellation is cooperative because Obsidian `requestUrl()` exposes no `AbortSignal`: Syncer

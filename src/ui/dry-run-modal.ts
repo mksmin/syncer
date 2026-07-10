@@ -239,7 +239,8 @@ export class DryRunModal extends Modal {
       this.actionsEl,
       "Синхронизировать всё",
       this.actions.syncAll,
-      this.plan.downloadCount + this.plan.updateCount === 0,
+      this.plan.downloadCount + this.plan.updateCount + this.plan.deletionAssessment.deleteCount ===
+        0,
     );
     actionButton(
       this.actionsEl,
