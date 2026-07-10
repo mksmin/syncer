@@ -1,9 +1,9 @@
 {
   "id": "syncer",
   "name": "Syncer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "minAppVersion": "1.6.0",
-  "description": "Safely plans a pull-only mirror from Yandex Disk to a local vault.",
+  "description": "Pull-only Yandex Disk mirror with verified new-file downloads.",
   "author": "mksmin",
   "isDesktopOnly": false
 }

@@ -14,12 +14,12 @@ Public-client-safe OAuth PKCE flow, token storage/forget, connection check, exac
 jitter/Retry-After/timeout/abort, remote folder picker, HTTP mocks. Result: complete remote file
 count; no local changes.
 
-## v0.3.0 — real dry run (current)
+## v0.3.0 — real dry run (done)
 
 Local index, filters, snapshot binding, comparator, real `SyncPlan`, dry-run modal, deletion
 thresholds and root/provider migration guard. Result: real plan, zero file changes.
 
-## v0.4.0 — create new local files
+## v0.4.0 — create new local files (current)
 
 Bounded download queue, folders, text/binary Vault API, size/checksum verification, max size, retry,
 abort and partial result. Existing local files remain untouched.

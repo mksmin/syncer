@@ -53,7 +53,6 @@ function pickKnownSettings(value: Record<string, unknown>): Partial<SyncerSettin
   assignBoolean(result, "showNotice", value.showNotice);
   assignString(result, "yandexAccessToken", value.yandexAccessToken);
   assignString(result, "yandexRefreshToken", value.yandexRefreshToken);
-  assignString(result, "yandexClientId", value.yandexClientId);
   assignString(result, "yandexPendingPkceVerifier", value.yandexPendingPkceVerifier);
   assignString(result, "yandexDeviceId", value.yandexDeviceId);
   result.yandexTokenExpiresAt = clampInteger(

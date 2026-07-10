@@ -109,6 +109,20 @@ describe("YandexDiskProvider", () => {
     expect(transport.requests[1]?.url).toContain("offset=1");
   });
 
+  it("reports cumulative listing batches", async () => {
+    const transport = new MockTransport([
+      response(200, directory("/Vault", [file("/Vault/A.md")], 2, 0)),
+      response(200, directory("/Vault", [file("/Vault/B.md")], 2, 1)),
+    ]);
+    const counts: number[] = [];
+    await new YandexDiskProvider(client(transport), "/Vault").listFiles(
+      "/Vault",
+      undefined,
+      (batch) => counts.push(batch.discoveredFileCount),
+    );
+    expect(counts).toEqual([1, 2]);
+  });
+
   it("walks nested folders recursively", async () => {
     const transport = new MockTransport([
       response(

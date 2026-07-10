@@ -37,8 +37,9 @@ function tokenResponse(access = "access", refresh = "refresh"): HttpResponse {
 
 describe("YandexAuthService", () => {
   it("creates PKCE authorization URL without client secret", async () => {
-    const settings = migrateSettings({ yandexClientId: "client-id", yandexDeviceId: "device-123" });
+    const settings = migrateSettings({ yandexDeviceId: "device-123" });
     const service = new YandexAuthService({
+      clientId: "client-id",
       transport: new AuthTransport([]),
       settings: () => settings,
       saveSettings: async () => undefined,
@@ -54,12 +55,12 @@ describe("YandexAuthService", () => {
 
   it("exchanges code with verifier and stores tokens", async () => {
     const settings = migrateSettings({
-      yandexClientId: "client-id",
       yandexDeviceId: "device-123",
       yandexPendingPkceVerifier: "verifier",
     });
     const transport = new AuthTransport([tokenResponse()]);
     const service = new YandexAuthService({
+      clientId: "client-id",
       transport,
       settings: () => settings,
       saveSettings: async () => undefined,
@@ -80,13 +81,13 @@ describe("YandexAuthService", () => {
 
   it("refreshes an expiring token without storing a client secret", async () => {
     const settings = migrateSettings({
-      yandexClientId: "client-id",
       yandexAccessToken: "old",
       yandexRefreshToken: "refresh",
       yandexTokenExpiresAt: 1_001,
     });
     const transport = new AuthTransport([tokenResponse("new-access", "new-refresh")]);
     const service = new YandexAuthService({
+      clientId: "client-id",
       transport,
       settings: () => settings,
       saveSettings: async () => undefined,
@@ -109,6 +110,7 @@ describe("YandexAuthService", () => {
       yandexTokenExpiresAt: 123,
     });
     const service = new YandexAuthService({
+      clientId: "client-id",
       transport: new AuthTransport([]),
       settings: () => settings,
       saveSettings: async () => undefined,

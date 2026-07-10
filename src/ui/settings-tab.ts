@@ -27,18 +27,6 @@ export class SyncerSettingTab extends PluginSettingTab {
         dropdown.setDisabled(true);
       });
 
-    new Setting(this.containerEl)
-      .setName("Yandex OAuth Client ID")
-      .setDesc(
-        "Публичный идентификатор приложения. Client secret не нужен и не должен храниться в плагине.",
-      )
-      .addText((text) =>
-        text.setValue(this.plugin.settings.yandexClientId).onChange(async (value) => {
-          this.plugin.settings.yandexClientId = value.trim();
-          await this.plugin.saveSettings();
-        }),
-      );
-
     this.containerEl.createDiv({
       cls: "syncer-sensitive-data-warning",
       text: "Access token сохраняется в data.json. Не публикуйте и не прикладывайте этот файл к issue.",
@@ -136,7 +124,7 @@ export class SyncerSettingTab extends PluginSettingTab {
     new Setting(this.containerEl).setName("Синхронизация").setHeading();
     new Setting(this.containerEl)
       .setName("Удалять отсутствующие на сервере файлы")
-      .setDesc("В v0.3.0 операции только показываются в плане и не выполняются.")
+      .setDesc("В v0.4.0 удаления только показываются в плане и не выполняются.")
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.deleteMissingLocalFiles).onChange(async (value) => {
           this.plugin.settings.deleteMissingLocalFiles = value;

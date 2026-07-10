@@ -3,10 +3,10 @@
 1. Build `main.js`; copy `main.js`, `manifest.json`, `styles.css` to
    `<vault>/<vault.configDir>/plugins/syncer/` using supported file transfer.
 2. Enable community plugins and Syncer. Confirm manifest shows mobile support.
-3. Enter Yandex Client ID, finish confirmation-code authorization, run `Проверить` and choose a
-   remote folder through `Выбрать…`.
-4. Run `Показать предварительный план`; v0.3 must open summary and grouped operation lists, then
-   make zero file changes.
+3. Press `Авторизоваться`, finish confirmation-code authorization, run `Проверить` and choose a
+   remote folder through `Выбрать…`. No Client ID field should be visible.
+4. Run `Показать предварительный план`; v0.4 must open the modal immediately, append remote data in
+   batches, show progress and make zero file changes.
 5. Expand every section. Check long paths wrap, lists scroll, blocked deletion candidates open
    automatically and no row escapes screen width.
 6. Test 1,000+ paths, Cyrillic, spaces, `#`, `%`, `?`, nested/empty folders and binary names.
@@ -17,6 +17,9 @@
    `fetch` in bundle/source.
 10. Test revoked token, offline/timeout, missing root and cancellation. 429/Retry-After and partial
     pagination are covered by HTTP mocks; reproduce manually when practical.
+11. In a disposable vault, run `Скачать только новые файлы`. Confirm only missing files appear,
+    existing files keep byte-identical content, nested folders are created and progress updates in
+    the same modal.
 
 Manual matrix: current iPhone/iOS, iPadOS, macOS/Windows desktop; Wi-Fi/mobile/weak/offline;
 Obsidian foreground/background/resume. Real iPhone verification remains release blocker outside

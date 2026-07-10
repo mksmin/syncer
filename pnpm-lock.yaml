@@ -6,6 +6,10 @@ settings:
 
 importers:
   .:
+    dependencies:
+      spark-md5:
+        specifier: 3.0.2
+        version: 3.0.2
     devDependencies:
       "@eslint/js":
         specifier: ^9.39.4
@@ -13,6 +17,9 @@ importers:
       "@types/node":
         specifier: ^22.15.17
         version: 22.20.1
+      "@types/spark-md5":
+        specifier: 3.0.5
+        version: 3.0.5
       "@vitest/coverage-v8":
         specifier: ^3.2.4
         version: 3.2.7(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(yaml@2.9.0))
@@ -1024,6 +1031,12 @@ packages:
     resolution:
       {
         integrity: sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==,
+      }
+
+  "@types/spark-md5@3.0.5":
+    resolution:
+      {
+        integrity: sha512-lWf05dnD42DLVKQJZrDHtWFidcLrHuip01CtnC2/S6AMhX4t9ZlEUj4iuRlAnts0PQk7KESOqKxeGE/b6sIPGg==,
       }
 
   "@types/tern@0.23.9":
@@ -3043,6 +3056,12 @@ packages:
       }
     engines: { node: ">=0.10.0" }
 
+  spark-md5@3.0.2:
+    resolution:
+      {
+        integrity: sha512-wcFzz9cDfbuqe0FZzfi2or1sgyIrsDwmPwfZC4hiNidPdPINjeUwNfv5kldczoEAcjl9Y1L3SM7Uz2PUEQzxQw==,
+      }
+
   stackback@0.0.2:
     resolution:
       {
@@ -3927,6 +3946,8 @@ snapshots:
   "@types/node@22.20.1":
     dependencies:
       undici-types: 6.21.0
+
+  "@types/spark-md5@3.0.5": {}
 
   "@types/tern@0.23.9":
     dependencies:
@@ -5488,6 +5509,8 @@ snapshots:
   signal-exit@4.1.0: {}
 
   source-map-js@1.2.1: {}
+
+  spark-md5@3.0.2: {}
 
   stackback@0.0.2: {}
 

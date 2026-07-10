@@ -83,6 +83,24 @@
   padding: var(--size-4-3);
 }
 
+.syncer-live-progress {
+  margin-bottom: var(--size-4-4);
+}
+
+.syncer-live-progress-status {
+  margin-bottom: var(--size-4-2);
+  overflow-wrap: anywhere;
+}
+
+.syncer-live-progress-status.is-error {
+  color: var(--text-error);
+}
+
+.syncer-live-progress-bar {
+  display: block;
+  width: 100%;
+}
+
 .syncer-dry-run-safety {
   background: var(--background-secondary);
   color: var(--text-muted);

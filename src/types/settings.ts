@@ -36,14 +36,13 @@ export interface SyncerSettings {
   yandexAccessToken: string;
   yandexRefreshToken: string;
   yandexTokenExpiresAt: number;
-  yandexClientId: string;
   yandexPendingPkceVerifier: string;
   yandexDeviceId: string;
   webdav: WebDavSettings;
 }
 
 export const DEFAULT_SETTINGS: SyncerSettings = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   providerType: "yandex-disk",
   remoteRootPath: "/ObsidianVault",
   syncOnStartup: false,
@@ -67,7 +66,6 @@ export const DEFAULT_SETTINGS: SyncerSettings = {
   yandexAccessToken: "",
   yandexRefreshToken: "",
   yandexTokenExpiresAt: 0,
-  yandexClientId: "",
   yandexPendingPkceVerifier: "",
   yandexDeviceId: "",
   webdav: {

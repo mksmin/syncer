@@ -17,6 +17,7 @@ export interface PkcePair {
 export type PkceFactory = () => Promise<PkcePair>;
 
 export interface YandexAuthServiceOptions {
+  clientId: string;
   transport: HttpTransport;
   settings: () => SyncerSettings;
   saveSettings: () => Promise<void>;
@@ -40,16 +41,13 @@ export class YandexAuthService {
 
   async beginAuthorization(): Promise<string> {
     const settings = this.options.settings();
-    if (settings.yandexClientId.trim() === "") {
-      throw new AuthenticationError("Сначала укажите Yandex OAuth Client ID.");
-    }
     const pair = await this.pkceFactory();
     settings.yandexPendingPkceVerifier = pair.verifier;
     if (settings.yandexDeviceId === "") settings.yandexDeviceId = createDeviceId();
     await this.options.saveSettings();
     const query = new URLSearchParams({
       response_type: "code",
-      client_id: settings.yandexClientId.trim(),
+      client_id: this.options.clientId,
       redirect_uri: REDIRECT_URI,
       force_confirm: "yes",
       code_challenge: pair.challenge,
@@ -68,7 +66,7 @@ export class YandexAuthService {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
       code: code.trim(),
-      client_id: settings.yandexClientId.trim(),
+      client_id: this.options.clientId,
       code_verifier: settings.yandexPendingPkceVerifier,
       device_id: settings.yandexDeviceId,
       device_name: "Syncer for Obsidian",
@@ -94,7 +92,7 @@ export class YandexAuthService {
     const body = new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: settings.yandexRefreshToken,
-      client_id: settings.yandexClientId.trim(),
+      client_id: this.options.clientId,
     });
     const token = await this.requestToken(body, signal);
     applyToken(settings, token, this.now());

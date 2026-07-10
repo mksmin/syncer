@@ -17,7 +17,7 @@ describe("settings", () => {
       concurrentDownloads: 99,
       deletionSafety: { maxDeletePercentage: -2 },
     });
-    expect(settings.schemaVersion).toBe(2);
+    expect(settings.schemaVersion).toBe(3);
     expect(settings.concurrentDownloads).toBe(5);
     expect(settings.deletionSafety.maxDeletePercentage).toBe(0);
   });

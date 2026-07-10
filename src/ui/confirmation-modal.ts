@@ -23,8 +23,8 @@ export class ConfirmationModal extends Modal {
           .setCta()
           .onClick(async () => {
             button.setDisabled(true);
-            await this.onConfirm();
             this.close();
+            await this.onConfirm();
           }),
       );
   }

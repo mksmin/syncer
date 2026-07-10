@@ -1,5 +1,11 @@
 # Third-party notices
 
+## spark-md5
+
+- Package: `spark-md5` 3.0.2.
+- License: MIT or WTFPL.
+- Used for browser-compatible MD5 verification of downloaded Yandex Disk content.
+
 No third-party source code was copied or adapted in Syncer v0.1.0. Research used architecture and
 public API behavior only.
 

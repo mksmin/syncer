@@ -13,6 +13,13 @@ export interface RemoteFolder {
   path: string;
 }
 
+export interface YandexListingBatch {
+  files: readonly RemoteFile[];
+  discoveredFileCount: number;
+  processedFolderCount: number;
+  pendingFolderCount: number;
+}
+
 export class YandexDiskProvider implements RemoteStorageProvider {
   readonly type = "yandex-disk" as const;
 
@@ -34,19 +41,32 @@ export class YandexDiskProvider implements RemoteStorageProvider {
     return { ok: true, message: "Подключение к Яндекс Диску работает.", checkedAt: Date.now() };
   }
 
-  async listFiles(rootPath: string, signal?: AbortSignal): Promise<RemoteFile[]> {
+  async listFiles(
+    rootPath: string,
+    signal?: AbortSignal,
+    onBatch?: (batch: YandexListingBatch) => void,
+  ): Promise<RemoteFile[]> {
     const root = normalizeRemoteRoot(rootPath);
     const files: RemoteFile[] = [];
     const folders = [root];
+    let processedFolderCount = 0;
     while (folders.length > 0) {
       throwIfAborted(signal);
       const folder = folders.shift();
       if (folder === undefined) break;
-      const children = await this.listDirectory(folder, signal);
-      for (const child of children) {
-        if (child.type === "dir") folders.push(resourcePath(child));
-        else files.push(mapYandexFile(child, root));
-      }
+      await this.listDirectory(folder, signal, (children) => {
+        for (const child of children) {
+          if (child.type === "dir") folders.push(resourcePath(child));
+          else files.push(mapYandexFile(child, root));
+        }
+        onBatch?.({
+          files,
+          discoveredFileCount: files.length,
+          processedFolderCount,
+          pendingFolderCount: folders.length,
+        });
+      });
+      processedFolderCount += 1;
     }
     return files;
   }
@@ -64,7 +84,11 @@ export class YandexDiskProvider implements RemoteStorageProvider {
     return await this.client.download(link.href, signal);
   }
 
-  private async listDirectory(path: string, signal?: AbortSignal): Promise<YandexResource[]> {
+  private async listDirectory(
+    path: string,
+    signal?: AbortSignal,
+    onPage?: (items: readonly YandexResource[]) => void,
+  ): Promise<YandexResource[]> {
     const result: YandexResource[] = [];
     let offset = 0;
     let total: number | undefined;
@@ -84,6 +108,7 @@ export class YandexDiskProvider implements RemoteStorageProvider {
         throw new IntegrityError(`Яндекс Диск вернул неполную страницу папки ${path}.`);
       }
       result.push(...embedded.items);
+      onPage?.(embedded.items);
       offset += embedded.items.length;
     } while (total !== undefined && offset < total);
     return result;
