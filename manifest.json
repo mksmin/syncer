@@ -1,7 +1,7 @@
 {
   "id": "syncer",
   "name": "Syncer",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "minAppVersion": "1.6.6",
   "description": "iOS-ready pull-only Yandex Disk mirror with selective sync and safe local trash.",
   "author": "mksmin",

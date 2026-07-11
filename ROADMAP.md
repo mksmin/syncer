@@ -47,12 +47,12 @@ individual new/update files, incremental list expansion and selective sync.
 data, single-job mobile memory policy, progress throttling, iPhone/iPad/desktop matrix and enforced
 Node API bundle audit.
 
-## v0.9.0 — explicit sync flows (current)
+## v0.9.0 — explicit sync flows (done)
 
 Separate background-now, fresh-plan and status actions; forced plan rebuild, startup and periodic
 background scheduling, single active session and settings-screen launch buttons.
 
-## v1.0.0 — production Yandex mirror
+## v1.0.0 — production Yandex mirror (current)
 
 Pull-only new/update/trash, progress/settings/startup/abort/retry/filter/max size/deletion safety,
 documentation, tests and release workflow. Real iPhone verification required.

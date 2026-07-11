@@ -57,6 +57,7 @@ function pickKnownSettings(value: Record<string, unknown>): Partial<SyncerSettin
   }
   assignString(result, "remoteRootPath", value.remoteRootPath);
   assignBoolean(result, "syncOnStartup", value.syncOnStartup);
+  assignBoolean(result, "notifyOnAutomaticSync", value.notifyOnAutomaticSync);
   if (
     value.backgroundSyncMode === "all" ||
     value.backgroundSyncMode === "new" ||

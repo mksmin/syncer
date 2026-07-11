@@ -17,7 +17,7 @@ describe("settings", () => {
       concurrentDownloads: 99,
       deletionSafety: { maxDeletePercentage: -2 },
     });
-    expect(settings.schemaVersion).toBe(6);
+    expect(settings.schemaVersion).toBe(7);
     expect(settings.concurrentDownloads).toBe(5);
     expect(settings.deletionSafety.maxDeletePercentage).toBe(0);
   });
@@ -37,6 +37,11 @@ describe("settings", () => {
     expect(
       migrateSettings({ backgroundSyncIntervalMinutes: 10_000 }).backgroundSyncIntervalMinutes,
     ).toBe(1_440);
+  });
+
+  it("migrates automatic sync notifications", () => {
+    expect(migrateSettings(undefined).notifyOnAutomaticSync).toBe(true);
+    expect(migrateSettings({ notifyOnAutomaticSync: false }).notifyOnAutomaticSync).toBe(false);
   });
 
   it("adds the Codex metadata exclusion to existing settings", () => {

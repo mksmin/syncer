@@ -5,7 +5,7 @@
 2. Enable community plugins and Syncer. Confirm manifest shows mobile support.
 3. Press `Авторизоваться`, finish confirmation-code authorization, run `Проверить` and choose a
    remote folder through `Выбрать…`. No Client ID field should be visible.
-4. Run `Создать новый план синхронизации`; v0.9 must open the modal immediately, append remote data
+4. Run `Создать новый план синхронизации`; v1.0 must open the modal immediately, append remote data
    in batches, show progress and make zero file changes.
 5. Expand every section. Check long paths wrap, lists scroll, blocked deletion candidates open
    automatically and no row escapes screen width.
@@ -21,7 +21,7 @@
     must show remote/local size and modification dates.
 12. Change a local file after dry run but before confirmation. Sync must refuse that overwrite and
     show a per-file error.
-13. Test every background rule. Startup, timer and `Синхронизировать в фоне сейчас` must run without
+13. Test every background rule. Startup, timer and `Ручная синхронизация в фоне` must run without
     opening a modal or asking confirmation. A remote deletion must never remove or trash its local
     file.
 14. Repeat background sync within 60 seconds. Confirm it reports use of cache, makes no new listing
@@ -47,6 +47,8 @@
 22. After a completed sync, change local and remote files, press `Пересобрать план` and confirm both
     changes appear. Enable a timer, confirm one background run, then disable it and confirm no more
     runs start. iOS may pause timers while Obsidian is backgrounded.
+23. Confirm startup/timer sync shows a start notification. Disable automatic-sync notifications and
+    confirm the next automatic run stays silent.
 
 Manual matrix: current iPhone/iOS, iPadOS, macOS/Windows desktop; Wi-Fi/mobile/weak/offline;
 Obsidian foreground/background/resume. Real iPhone verification remains release blocker outside

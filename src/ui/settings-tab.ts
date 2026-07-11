@@ -167,6 +167,16 @@ export class SyncerSettingTab extends PluginSettingTab {
       });
 
     new Setting(this.containerEl)
+      .setName("Уведомлять об автоматической синхронизации")
+      .setDesc("Показывает уведомление при запуске startup- или timer-синхронизации.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.notifyOnAutomaticSync).onChange(async (value) => {
+          this.plugin.settings.notifyOnAutomaticSync = value;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(this.containerEl)
       .setName("Задержка запуска")
       .setDesc("Пауза после готовности интерфейса Obsidian.")
       .addDropdown((dropdown) => {

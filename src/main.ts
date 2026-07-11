@@ -1,4 +1,13 @@
-import { Notice, Platform, Plugin, setIcon, TFile, type FileManager, type Vault } from "obsidian";
+import {
+  Notice,
+  Platform,
+  Plugin,
+  setIcon,
+  TFile,
+  type App,
+  type FileManager,
+  type Vault,
+} from "obsidian";
 import { YANDEX_CLIENT_ID } from "./constants";
 import { GlobPathFilter } from "./filters/path-filter";
 import { errorMessage } from "./infrastructure/errors";
@@ -69,6 +78,13 @@ interface PluginData {
   lastPlan?: SyncPlan;
 }
 
+interface AppWithSettings extends App {
+  setting: {
+    open: () => void;
+    openTabById: (id: string) => void;
+  };
+}
+
 export default class SyncerPlugin extends Plugin {
   override settings = migrateSettings(undefined);
   private syncState = emptySyncState();
@@ -111,12 +127,12 @@ export default class SyncerPlugin extends Plugin {
     });
     this.addCommand({
       id: "sync-now",
-      name: "Синхронизировать в фоне сейчас",
+      name: "Ручная синхронизация в фоне",
       callback: () => this.startBackgroundSync(),
     });
     this.addCommand({
       id: "stop-sync",
-      name: "Остановить синхронизацию",
+      name: "Остановить текущую синхронизацию",
       checkCallback: (checking) => {
         if (!this.planning) return false;
         if (!checking) this.cancel();
@@ -129,8 +145,13 @@ export default class SyncerPlugin extends Plugin {
       callback: () => this.openSyncStatus(),
     });
     this.addCommand({
+      id: "open-settings",
+      name: "Открыть настройки",
+      callback: () => this.openPluginSettings(),
+    });
+    this.addCommand({
       id: "check-connection",
-      name: "Проверить подключение",
+      name: "Проверить подключение к Яндекс Диску",
       callback: () => void this.checkYandexConnection(),
     });
 
@@ -330,6 +351,13 @@ export default class SyncerPlugin extends Plugin {
     if (this.planning) {
       if (source === "manual") this.reopenActiveOperation();
       return;
+    }
+    if (source !== "manual" && this.settings.notifyOnAutomaticSync) {
+      new Notice(
+        source === "startup"
+          ? "Началась автоматическая синхронизация после запуска."
+          : "Началась автоматическая синхронизация по таймеру.",
+      );
     }
     const modal = new DryRunModal(this.app);
     const plan = await this.preparePlanForExecution(modal);
@@ -741,6 +769,12 @@ export default class SyncerPlugin extends Plugin {
     this.activeModal.open();
   }
 
+  private openPluginSettings(): void {
+    const settings = (this.app as AppWithSettings).setting;
+    settings.open();
+    settings.openTabById(this.manifest.id);
+  }
+
   private clearBackgroundInterval(): void {
     if (this.backgroundIntervalId === undefined) return;
     window.clearInterval(this.backgroundIntervalId);
@@ -778,7 +812,7 @@ export default class SyncerPlugin extends Plugin {
     this.ribbonEl.toggleClass("is-planning", running);
     this.ribbonEl.setAttribute(
       "aria-label",
-      running ? "Подготовка плана синхронизации…" : "Показать план синхронизации",
+      running ? "Подготовка плана синхронизации…" : "Создать новый план синхронизации",
     );
     setIcon(this.ribbonEl, running ? "loader-circle" : "cloud-download");
   }

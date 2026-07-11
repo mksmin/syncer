@@ -23,6 +23,11 @@ export default tseslint.config(
     files: ["**/*.js", "**/*.mjs", "**/*.cjs"],
   },
   {
+    files: ["scripts/**/*.js", "scripts/**/*.mjs"],
+    languageOptions: { globals: globals.node },
+    rules: { "obsidianmd/no-nodejs-modules": "off" },
+  },
+  {
     files: ["**/*.ts", "**/*.mts"],
     languageOptions: {
       globals: globals.browser,
