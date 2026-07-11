@@ -19,6 +19,9 @@
   remains and result contains error.
 - Select one new and one update path: only those two execute; unselected paths and all trash remain
   untouched. Selection survives batch re-render and modal reopen.
+- Mobile concurrency policy returns one job regardless of configured 1–5; desktop keeps configured
+  value. Planner preserves 1,500 unique Unicode/special-character paths.
+- Production bundle audit rejects Node/Electron/Axios/direct fetch and bundles above 512 KiB.
 
 v0.2 automates planner, Yandex pagination/recursion, typed HTTP errors, retry, cancellation, binary
 download transport and PKCE token flow. v0.3 adds strict persisted-state validation, exact snapshot

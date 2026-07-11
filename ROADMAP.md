@@ -35,16 +35,17 @@ startup/background sync rule without trash, separate planned sync UI and file di
 count and percentage confirmation, explicit without-trash choice, startup prohibition and
 mass-delete tests.
 
-## v0.7.0 — settings and UX (current)
+## v0.7.0 — settings and UX (done)
 
-Full settings sections, auth UI, ribbon states, throttled progress/Notice, result/error details,
-dangerous confirmations, RU/EN-ready strings, mobile layout, checkboxes for selecting individual
-new/update files, incremental list expansion and an action that syncs only the selection.
+Settings sections, auth UI, ribbon states, throttled progress/Notice, result/error details,
+dangerous confirmations, consistent Russian strings, mobile layout, checkboxes for selecting
+individual new/update files, incremental list expansion and selective sync.
 
-## v0.8.0 — iOS stabilization
+## v0.8.0 — iOS stabilization (current)
 
-1,000+ files, Cyrillic/special chars, binaries, interruption/background/weak network/mobile data,
-memory and throttle profiling, iPhone/iPad/desktop matrix, Node API bundle audit.
+1,500+ planner stress, Cyrillic/special chars, binaries, interruption/background/weak network/mobile
+data, single-job mobile memory policy, progress throttling, iPhone/iPad/desktop matrix and enforced
+Node API bundle audit.
 
 ## v1.0.0 — production Yandex mirror
 
@@ -54,7 +55,8 @@ documentation, tests and release workflow. Real iPhone verification required.
 ## v1.1.0 — history and diagnostics
 
 Recent runs, redacted diagnostics, timings, retry failed files, copyable report, improved debug
-mode. RFC for optional remote index manifest; local persistent cache remains preferred.
+mode, localization catalog. RFC for optional remote index manifest; local persistent cache remains
+preferred.
 
 ## v1.2.0 — WebDAV
 

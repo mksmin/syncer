@@ -1,12 +1,13 @@
 {
   "name": "syncer",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Pull-only remote storage mirror for Obsidian, designed for iOS.",
   "main": "main.js",
   "type": "module",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "npm run typecheck && node esbuild.config.mjs production",
+    "build": "npm run typecheck && node esbuild.config.mjs production && node scripts/check-mobile-bundle.mjs",
+    "check:mobile-bundle": "node scripts/check-mobile-bundle.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",

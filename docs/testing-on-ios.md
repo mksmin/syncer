@@ -5,7 +5,7 @@
 2. Enable community plugins and Syncer. Confirm manifest shows mobile support.
 3. Press `Авторизоваться`, finish confirmation-code authorization, run `Проверить` and choose a
    remote folder through `Выбрать…`. No Client ID field should be visible.
-4. Run `Плановая синхронизация`; v0.7 must open the modal immediately, append remote data in
+4. Run `Плановая синхронизация`; v0.8 must open the modal immediately, append remote data in
    batches, show progress and make zero file changes.
 5. Expand every section. Check long paths wrap, lists scroll, blocked deletion candidates open
    automatically and no row escapes screen width.
@@ -39,6 +39,10 @@
 19. Select individual new/update rows, close/reopen the modal and run selective sync. Only checked
     paths may change; trash must remain untouched. Expand a section beyond 200 rows with
     `Показать ещё` and verify selection remains stable.
+20. Set parallel downloads to 5 on iPhone and confirm actual executor remains sequential. Repeat on
+    desktop and confirm configured concurrency is preserved.
+21. Run production build and `check:mobile-bundle`; audit must pass. Test 1,500+ paths and watch for
+    UI stalls or app termination while updating large binaries.
 
 Manual matrix: current iPhone/iOS, iPadOS, macOS/Windows desktop; Wi-Fi/mobile/weak/offline;
 Obsidian foreground/background/resume. Real iPhone verification remains release blocker outside

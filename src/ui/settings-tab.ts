@@ -193,7 +193,7 @@ export class SyncerSettingTab extends PluginSettingTab {
 
     new Setting(this.containerEl)
       .setName("Параллельные загрузки")
-      .setDesc("Одновременные download/update; диапазон 1–5.")
+      .setDesc("Desktop: 1–5. На iOS/Android всегда 1 для ограничения memory peak.")
       .addDropdown((dropdown) => {
         dropdown
           .addOption("1", "1 файл")

@@ -9,13 +9,13 @@ UGREEN NAS появится позже.
 > Синхронизация не является резервным копированием. Перед первым использованием сделайте независимую
 > резервную копию.
 
-## Current release: v0.7.0
+## Current release: v0.8.0
 
 Работают OAuth confirmation-code + PKCE без client secret, проверка подключения, выбор существующей
 папки, рекурсивный индекс Яндекс Диска со всей пагинацией, retry/Retry-After/timeout/отмена и
 реальный dry run относительно текущего vault. v0.3 добавляет полный мобильный отчёт: сводку,
 download bytes, списки новых/изменённых/удаляемых/пропущенных файлов, причины пропуска и явные
-предупреждения deletion guard. v0.7 безопасно создаёт отсутствующие, обновляет существующие и по
+предупреждения deletion guard. v0.8 безопасно создаёт отсутствующие, обновляет существующие и по
 явному ручному выбору перемещает отсутствующие на сервере local files в корзину Obsidian. Перед
 каждым update/trash повторно проверяется local stat; trash всегда идёт после успешных загрузок.
 
@@ -45,7 +45,7 @@ Access token, refresh token и временный PKCE verifier хранятся
 публикуйте этот файл. Если refresh публичного клиента отклонён настройками приложения, Syncer
 попросит повторную авторизацию; client secret всё равно не сохраняется.
 
-## Use v0.7
+## Use v0.8
 
 Нажмите cloud-download ribbon или команду `Плановая синхронизация`. Syncer откроет окно, прочитает
 дерево выбранной папки и покажет подробный план. Каждая строка содержит размер, разницу и даты
@@ -102,9 +102,10 @@ Defaults: `.obsidian/**`, `.trash/**`, `.git/**`, `.codex/**`, `.DS_Store`, `Thu
 ## iOS limits
 
 Минимальная версия Obsidian — 1.6.6 (`FileManager.trashFile`). Плагин использует Obsidian API и
-browser runtime, без Node/Electron/Axios. Obsidian не даёт плагину работать после полного закрытия и
-может заморозить background app. Обычный download хранится в памяти до проверки; default max file
-size — 50 MB, concurrency — 3.
+browser runtime, без Node/Electron/Axios/direct fetch. Production build автоматически проверяет
+mobile bundle. Obsidian не даёт плагину работать после полного закрытия и может заморозить
+background app. Download хранится в памяти до проверки. На iOS/Android executor всегда обрабатывает
+один файл; desktop использует настройку 1–5. Default max file size — 50 MB.
 
 ## Privacy and security
 

@@ -1,4 +1,4 @@
-import { Notice, Plugin, setIcon, TFile, type FileManager, type Vault } from "obsidian";
+import { Notice, Platform, Plugin, setIcon, TFile, type FileManager, type Vault } from "obsidian";
 import { YANDEX_CLIENT_ID } from "./constants";
 import { GlobPathFilter } from "./filters/path-filter";
 import { errorMessage } from "./infrastructure/errors";
@@ -11,6 +11,7 @@ import { YandexDiskProvider, type RemoteFolder } from "./providers/yandex/yandex
 import { migrateSettings } from "./settings/settings-migration";
 import { LocalVaultIndex } from "./sync/local-vault-index";
 import { NewFileExecutor } from "./sync/new-file-executor";
+import { effectiveDownloadConcurrency } from "./sync/concurrency-policy";
 import {
   UpdateFileExecutor,
   type UpdateFileVault,
@@ -414,7 +415,10 @@ export default class SyncerPlugin extends Plugin {
       const executor = new NewFileExecutor({
         vault: this.app.vault,
         provider,
-        concurrency: this.settings.concurrentDownloads,
+        concurrency: effectiveDownloadConcurrency(
+          this.settings.concurrentDownloads,
+          Platform.isMobileApp,
+        ),
         onCreated: (result) => this.recordCreatedFile(result, remoteRoot),
         onProgress: (completed, _downloadTotal, currentPath) => {
           modal.setProgress(
@@ -431,7 +435,10 @@ export default class SyncerPlugin extends Plugin {
           : await new UpdateFileExecutor({
               vault: createUpdateFileVault(this.app.vault),
               provider,
-              concurrency: this.settings.concurrentDownloads,
+              concurrency: effectiveDownloadConcurrency(
+                this.settings.concurrentDownloads,
+                Platform.isMobileApp,
+              ),
               onUpdated: (result) => this.recordCreatedFile(result, remoteRoot),
               onProgress: (completed, _updateTotal, currentPath) => {
                 modal.setProgress(
