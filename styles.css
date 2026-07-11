@@ -191,12 +191,34 @@
   padding: var(--size-4-2) 0;
 }
 
+.syncer-plan-row.is-selectable {
+  align-items: flex-start;
+  display: grid;
+  gap: var(--size-4-3);
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.syncer-plan-checkbox {
+  margin-top: var(--size-4-1);
+  min-height: 1.25rem;
+  min-width: 1.25rem;
+}
+
+.syncer-plan-row-content {
+  min-width: 0;
+}
+
 .syncer-plan-path {
   overflow-wrap: anywhere;
 }
 
 .syncer-plan-more {
   padding: var(--size-4-3) 0;
+}
+
+.syncer-plan-show-more {
+  margin-top: var(--size-4-2);
+  width: 100%;
 }
 
 @media (min-width: 500px) {

@@ -10,11 +10,13 @@ import type { SyncOperation, SyncPlan } from "../types/sync";
 import type { FileExecutionError } from "../types/execution";
 
 const MAX_VISIBLE_OPERATIONS = 200;
+const PROGRESS_RENDER_INTERVAL_MS = 100;
 
 export interface DryRunActions {
   syncAll: () => void;
   downloadNew: () => void;
   updateExisting: () => void;
+  syncSelected: (selectedPaths: readonly string[]) => void;
 }
 
 interface ProgressState {
@@ -43,6 +45,9 @@ export class DryRunModal extends Modal {
   private progressState: ProgressState;
   private operationState: OperationState = { mode: "preview" };
   private readonly sectionOpen = new Map<string, boolean>();
+  private readonly sectionVisibleCounts = new Map<string, number>();
+  private readonly selectedPaths = new Set<string>();
+  private lastProgressRenderAt = 0;
 
   constructor(app: App, plan?: SyncPlan) {
     super(app);
@@ -79,12 +84,26 @@ export class DryRunModal extends Modal {
       ...(total === undefined ? {} : { total }),
       isError: false,
     };
-    this.renderProgress();
+    const now = Date.now();
+    const isFinal = current !== undefined && total !== undefined && current >= total;
+    if (isFinal || now - this.lastProgressRenderAt >= PROGRESS_RENDER_INTERVAL_MS) {
+      this.renderProgress();
+      this.lastProgressRenderAt = now;
+    }
   }
 
   updatePlan(plan: SyncPlan, complete: boolean): void {
     this.plan = plan;
+    if (complete) {
+      const executablePaths = new Set(
+        plan.operations.filter(isSelectableOperation).map((operation) => operation.relativePath),
+      );
+      for (const path of this.selectedPaths) {
+        if (!executablePaths.has(path)) this.selectedPaths.delete(path);
+      }
+    }
     this.renderPlan();
+    this.renderActions();
     if (complete) this.setProgress("План готов", 1, 1);
   }
 
@@ -96,18 +115,21 @@ export class DryRunModal extends Modal {
   beginOperation(message: string, onCancel: () => void): void {
     this.operationState = { mode: "active", message, onCancel };
     this.renderOperationState();
+    this.renderPlan();
     this.renderActions();
   }
 
   endOperation(message: string): void {
     this.operationState = { mode: "finished", message };
     this.renderOperationState();
+    this.renderPlan();
     this.renderActions();
   }
 
   showError(message: string): void {
     this.progressState = { message, isError: true };
     this.renderProgress();
+    this.lastProgressRenderAt = Date.now();
   }
 
   showExecutionErrors(errors: readonly FileExecutionError[]): void {
@@ -202,14 +224,32 @@ export class DryRunModal extends Modal {
         text: `${section.title}: ${String(section.operations.length)}`,
       });
       const list = details.createDiv({ cls: "syncer-plan-list" });
-      for (const operation of section.operations.slice(0, MAX_VISIBLE_OPERATIONS)) {
-        renderOperation(list, operation);
+      const visibleCount = this.sectionVisibleCounts.get(section.title) ?? MAX_VISIBLE_OPERATIONS;
+      for (const operation of section.operations.slice(0, visibleCount)) {
+        renderOperation(
+          list,
+          operation,
+          this.selectedPaths.has(operation.relativePath),
+          this.operationState.mode === "active",
+          (selected) => {
+            if (selected) this.selectedPaths.add(operation.relativePath);
+            else this.selectedPaths.delete(operation.relativePath);
+            this.renderActions();
+          },
+        );
       }
-      const hiddenCount = section.operations.length - MAX_VISIBLE_OPERATIONS;
+      const hiddenCount = section.operations.length - visibleCount;
       if (hiddenCount > 0) {
-        list.createDiv({
-          cls: "syncer-plan-more",
-          text: `Ещё ${String(hiddenCount)} операций не показано для экономии памяти.`,
+        const more = list.createDiv({ cls: "syncer-plan-more" });
+        more.createDiv({ text: `Скрыто файлов: ${String(hiddenCount)}.` });
+        const nextCount = Math.min(hiddenCount, MAX_VISIBLE_OPERATIONS);
+        const button = more.createEl("button", {
+          cls: "syncer-plan-show-more",
+          text: `Показать ещё: ${String(nextCount)}`,
+        });
+        button.addEventListener("click", () => {
+          this.sectionVisibleCounts.set(section.title, visibleCount + nextCount);
+          this.renderPlan();
         });
       }
     }
@@ -235,6 +275,12 @@ export class DryRunModal extends Modal {
       this.operationState.mode === "active"
     )
       return;
+    actionButton(
+      this.actionsEl,
+      `Синхронизировать выбранное: ${String(this.selectedPaths.size)}`,
+      () => this.actions?.syncSelected([...this.selectedPaths]),
+      this.selectedPaths.size === 0,
+    );
     actionButton(
       this.actionsEl,
       "Синхронизировать всё",
@@ -274,10 +320,30 @@ function summaryCard(parent: HTMLElement, label: string, value: number | string)
   card.createDiv({ cls: "syncer-plan-summary-label", text: label });
 }
 
-function renderOperation(parent: HTMLElement, operation: SyncOperation): void {
+function renderOperation(
+  parent: HTMLElement,
+  operation: SyncOperation,
+  selected: boolean,
+  disabled: boolean,
+  onSelectionChange: (selected: boolean) => void,
+): void {
   const row = parent.createDiv({ cls: "syncer-plan-row" });
-  row.createDiv({ cls: "syncer-plan-path", text: operation.relativePath });
-  row.createDiv({ cls: "syncer-plan-detail", text: operationDetail(operation) });
+  if (isSelectableOperation(operation)) {
+    row.addClass("is-selectable");
+    const checkbox = row.createEl("input", { cls: "syncer-plan-checkbox" });
+    checkbox.type = "checkbox";
+    checkbox.checked = selected;
+    checkbox.disabled = disabled;
+    checkbox.setAttribute("aria-label", `Выбрать ${operation.relativePath}`);
+    checkbox.addEventListener("change", () => onSelectionChange(checkbox.checked));
+  }
+  const content = row.createDiv({ cls: "syncer-plan-row-content" });
+  content.createDiv({ cls: "syncer-plan-path", text: operation.relativePath });
+  content.createDiv({ cls: "syncer-plan-detail", text: operationDetail(operation) });
+}
+
+function isSelectableOperation(operation: SyncOperation): boolean {
+  return operation.type === "DOWNLOAD_NEW" || operation.type === "UPDATE_LOCAL";
 }
 
 function isBlockedDeletionCandidate(operation: SyncOperation): boolean {

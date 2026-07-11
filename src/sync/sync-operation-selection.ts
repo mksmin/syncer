@@ -26,3 +26,14 @@ export function selectPullOperations(
           ),
   };
 }
+
+export function selectPullOperationsByPath(
+  plan: SyncPlan,
+  selectedPaths: ReadonlySet<string>,
+): SelectedPullOperations {
+  const all = selectPullOperations(plan, "all");
+  return {
+    downloads: all.downloads.filter((operation) => selectedPaths.has(operation.relativePath)),
+    updates: all.updates.filter((operation) => selectedPaths.has(operation.relativePath)),
+  };
+}

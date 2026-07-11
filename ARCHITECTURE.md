@@ -1,7 +1,7 @@
 # Syncer architecture
 
 Syncer — pull-only зеркало: remote storage является источником истины, локальный Obsidian vault —
-читаемой копией. v0.6.0 читает реальные remote/local индексы, показывает live plan батчами, создаёт,
+читаемой копией. v0.7.0 читает реальные remote/local индексы, показывает live plan батчами, создаёт,
 обновляет и через ручное подтверждение перемещает local-only files в корзину Obsidian.
 
 ## Поток данных
@@ -41,6 +41,8 @@ provider регистрируется без изменения planner/executor
 8. Одна session; `AbortController` останавливает новые операции и следующий trash file.
 9. Startup/background session никогда не получает `TRASH_LOCAL`; только ручной plan может передать
    trash executor после отдельного выбора пользователя.
+10. Выбор отдельных файлов фильтрует только `DOWNLOAD_NEW`/`UPDATE_LOCAL`; selective action не может
+    неявно включить `TRASH_LOCAL`.
 
 ## Состояния
 

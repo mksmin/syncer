@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { selectPullOperations } from "../src/sync/sync-operation-selection";
+import {
+  selectPullOperations,
+  selectPullOperationsByPath,
+} from "../src/sync/sync-operation-selection";
 import type { SyncPlan } from "../src/types/sync";
 
 const plan = {
@@ -27,5 +30,11 @@ describe("selectPullOperations", () => {
     const selected = selectPullOperations(plan, "updates");
     expect(selected.downloads).toHaveLength(0);
     expect(selected.updates).toHaveLength(1);
+  });
+
+  it("selects only requested executable paths", () => {
+    const selected = selectPullOperationsByPath(plan, new Set(["Changed.md", "Same.md"]));
+    expect(selected.downloads).toHaveLength(0);
+    expect(selected.updates.map((item) => item.relativePath)).toEqual(["Changed.md"]);
   });
 });

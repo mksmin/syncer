@@ -17,7 +17,11 @@ import {
   type UpdateVaultFile,
 } from "./sync/update-file-executor";
 import { SyncProgressReporter } from "./sync/progress-reporter";
-import { selectPullOperations, type PullSelection } from "./sync/sync-operation-selection";
+import {
+  selectPullOperations,
+  selectPullOperationsByPath,
+  type PullSelection,
+} from "./sync/sync-operation-selection";
 import { migrateSyncPlan } from "./sync/sync-plan-storage";
 import { PullSyncPlanner } from "./sync/sync-planner";
 import { emptySyncState, isSnapshotBoundTo, migrateSyncState } from "./sync/sync-state-repository";
@@ -576,7 +580,33 @@ export default class SyncerPlugin extends Plugin {
       syncAll: () => this.confirmPlanExecution(plan, "all", modal, remoteRoot),
       downloadNew: () => this.confirmPlanExecution(plan, "new", modal, remoteRoot),
       updateExisting: () => this.confirmPlanExecution(plan, "updates", modal, remoteRoot),
+      syncSelected: (selectedPaths) =>
+        this.confirmSelectedExecution(plan, selectedPaths, modal, remoteRoot),
     });
+  }
+
+  private confirmSelectedExecution(
+    plan: SyncPlan,
+    selectedPaths: readonly string[],
+    modal: DryRunModal,
+    remoteRoot: string,
+  ): void {
+    if (this.planning) {
+      this.reopenActiveOperation();
+      return;
+    }
+    const { downloads, updates } = selectPullOperationsByPath(plan, new Set(selectedPaths));
+    if (downloads.length === 0 && updates.length === 0) {
+      new Notice("Выбранные файлы больше не требуют синхронизации.");
+      return;
+    }
+    new ConfirmationModal(
+      this.app,
+      "Синхронизировать выбранные файлы?",
+      `Новых файлов: ${String(downloads.length)}. Изменённых файлов: ${String(updates.length)}. Удаления не выполняются.`,
+      `Синхронизировать: ${String(downloads.length + updates.length)}`,
+      () => this.executePullSync(downloads, updates, [], remoteRoot, modal),
+    ).open();
   }
 
   private confirmPlanExecution(
@@ -660,7 +690,6 @@ export default class SyncerPlugin extends Plugin {
       return;
     }
     this.activeModal.open();
-    new Notice("Операция продолжается. Открыт текущий прогресс.");
   }
 
   private async listRemoteFiles(

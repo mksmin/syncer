@@ -17,6 +17,8 @@
   plan may offer trash.
 - Download/update error or cancellation: zero trash calls. Local stat change after plan: that file
   remains and result contains error.
+- Select one new and one update path: only those two execute; unselected paths and all trash remain
+  untouched. Selection survives batch re-render and modal reopen.
 
 v0.2 automates planner, Yandex pagination/recursion, typed HTTP errors, retry, cancellation, binary
 download transport and PKCE token flow. v0.3 adds strict persisted-state validation, exact snapshot

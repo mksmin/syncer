@@ -29,17 +29,17 @@ abort and partial result. Existing local files remain untouched.
 Verified `UPDATE_LOCAL`, old-copy preservation on failure, per-file snapshot, result/progress modal,
 startup/background sync rule without trash, separate planned sync UI and file difference details.
 
-## v0.6.0 — safe trash (current)
+## v0.6.0 — safe trash (done)
 
 `TRASH_LOCAL` via `FileManager.trashFile()`, last-stage deletion, completeness/root/baseline guards,
 count and percentage confirmation, explicit without-trash choice, startup prohibition and
 mass-delete tests.
 
-## v0.7.0 — settings and UX
+## v0.7.0 — settings and UX (current)
 
 Full settings sections, auth UI, ribbon states, throttled progress/Notice, result/error details,
 dangerous confirmations, RU/EN-ready strings, mobile layout, checkboxes for selecting individual
-files and an action that syncs only the selection.
+new/update files, incremental list expansion and an action that syncs only the selection.
 
 ## v0.8.0 — iOS stabilization
 

@@ -5,7 +5,7 @@
 2. Enable community plugins and Syncer. Confirm manifest shows mobile support.
 3. Press `Авторизоваться`, finish confirmation-code authorization, run `Проверить` and choose a
    remote folder through `Выбрать…`. No Client ID field should be visible.
-4. Run `Плановая синхронизация`; v0.6 must open the modal immediately, append remote data in
+4. Run `Плановая синхронизация`; v0.7 must open the modal immediately, append remote data in
    batches, show progress and make zero file changes.
 5. Expand every section. Check long paths wrap, lists scroll, blocked deletion candidates open
    automatically and no row escapes screen width.
@@ -36,6 +36,9 @@
 18. Above count/percentage limits, verify warning, percentage and first 20 paths. Cancel, change one
     local candidate after plan and confirm it is refused. Any download/update error must block all
     trash operations.
+19. Select individual new/update rows, close/reopen the modal and run selective sync. Only checked
+    paths may change; trash must remain untouched. Expand a section beyond 200 rows with
+    `Показать ещё` and verify selection remains stable.
 
 Manual matrix: current iPhone/iOS, iPadOS, macOS/Windows desktop; Wi-Fi/mobile/weak/offline;
 Obsidian foreground/background/resume. Real iPhone verification remains release blocker outside
