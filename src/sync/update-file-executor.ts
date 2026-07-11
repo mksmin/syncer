@@ -104,10 +104,12 @@ export class UpdateFileExecutor {
         await this.options.vault.modifyBinary(file, backup);
       } catch (restoreError: unknown) {
         throw new IntegrityError(
-          `Не удалось обновить и восстановить ${path}: ${errorMessage(error)}; restore: ${errorMessage(restoreError)}`,
+          `Не удалось заменить локальный файл и восстановить резервную копию. Ошибка замены: ${errorMessage(error)}. Ошибка восстановления: ${errorMessage(restoreError)}.`,
         );
       }
-      throw new IntegrityError(`Обновление ${path} отменено; старая копия восстановлена.`);
+      throw new IntegrityError(
+        `Не удалось заменить локальный файл. Причина: ${errorMessage(error)}. Старая копия восстановлена.`,
+      );
     }
   }
 

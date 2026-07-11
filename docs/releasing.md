@@ -20,8 +20,8 @@ Obsidian требует tag строго в формате `x.y.z`, совпад
 5. Создать и отправить tag без `v`:
 
    ```bash
-   git tag 1.0.0
-   git push origin 1.0.0
+   git tag 1.0.1
+   git push origin 1.0.1
    ```
 
 6. GitHub Actions создаст draft release с обязательными отдельными assets и дополнительным ZIP.

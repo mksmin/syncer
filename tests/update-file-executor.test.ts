@@ -102,7 +102,8 @@ describe("UpdateFileExecutor", () => {
       concurrency: 1,
       onUpdated: async () => undefined,
     }).execute([operation()]);
-    expect(result.errors[0]?.message).toContain("старая копия восстановлена");
+    expect(result.errors[0]?.message).toContain("Причина: write failed");
+    expect(result.errors[0]?.message).toContain("Старая копия восстановлена");
     expect(new TextDecoder().decode(vault.content)).toBe("old");
   });
 });
