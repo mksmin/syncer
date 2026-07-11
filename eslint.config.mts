@@ -19,6 +19,10 @@ export default tseslint.config(
   ...tseslint.configs.stylisticTypeChecked,
   ...obsidianmd.configs.recommended,
   {
+    ...tseslint.configs.disableTypeChecked,
+    files: ["**/*.js", "**/*.mjs", "**/*.cjs"],
+  },
+  {
     files: ["**/*.ts", "**/*.mts"],
     languageOptions: {
       globals: globals.browser,

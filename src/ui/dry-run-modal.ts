@@ -275,9 +275,15 @@ export class DryRunModal extends Modal {
       this.operationState.mode === "active"
     )
       return;
+    if (this.plan.downloadCount + this.plan.updateCount > 0) {
+      this.actionsEl.createDiv({
+        cls: "syncer-selection-hint",
+        text: "Выборочно: раскройте «Новые файлы» или «Изменённые файлы» и нажмите на нужные строки.",
+      });
+    }
     actionButton(
       this.actionsEl,
-      `Синхронизировать выбранное: ${String(this.selectedPaths.size)}`,
+      `Синхронизировать выбранные файлы: ${String(this.selectedPaths.size)}`,
       () => this.actions?.syncSelected([...this.selectedPaths]),
       this.selectedPaths.size === 0,
     );
@@ -335,7 +341,24 @@ function renderOperation(
     checkbox.checked = selected;
     checkbox.disabled = disabled;
     checkbox.setAttribute("aria-label", `Выбрать ${operation.relativePath}`);
-    checkbox.addEventListener("change", () => onSelectionChange(checkbox.checked));
+    row.setAttribute("role", "checkbox");
+    row.setAttribute("aria-checked", String(selected));
+    row.tabIndex = disabled ? -1 : 0;
+    const setSelected = (nextSelected: boolean): void => {
+      checkbox.checked = nextSelected;
+      row.setAttribute("aria-checked", String(nextSelected));
+      onSelectionChange(nextSelected);
+    };
+    checkbox.addEventListener("change", () => setSelected(checkbox.checked));
+    row.addEventListener("click", (event) => {
+      if (disabled || event.target === checkbox) return;
+      setSelected(!checkbox.checked);
+    });
+    row.addEventListener("keydown", (event) => {
+      if (disabled || (event.key !== " " && event.key !== "Enter")) return;
+      event.preventDefault();
+      setSelected(!checkbox.checked);
+    });
   }
   const content = row.createDiv({ cls: "syncer-plan-row-content" });
   content.createDiv({ cls: "syncer-plan-path", text: operation.relativePath });

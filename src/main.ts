@@ -306,6 +306,7 @@ export default class SyncerPlugin extends Plugin {
     if (plan === undefined) return;
     const { downloads, updates } = selectPullOperations(plan, this.settings.backgroundSyncMode);
     const root = normalizeRemoteRoot(this.settings.remoteRootPath);
+    this.setPlanActions(modal, plan, root);
     if (downloads.length === 0 && updates.length === 0) {
       modal.setProgress("По правилу фоновой синхронизации изменений нет", 1, 1);
       this.lastSessionModal = modal;
@@ -572,6 +573,13 @@ export default class SyncerPlugin extends Plugin {
       return;
     }
     if (this.lastSessionModal !== undefined) {
+      if (this.lastPlan !== undefined) {
+        this.setPlanActions(
+          this.lastSessionModal,
+          this.lastPlan,
+          normalizeRemoteRoot(this.settings.remoteRootPath),
+        );
+      }
       this.lastSessionModal.open();
       return;
     }
