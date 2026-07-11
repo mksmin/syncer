@@ -24,6 +24,7 @@ export interface SyncerSettings {
   remoteRootPath: string;
   syncOnStartup: boolean;
   backgroundSyncMode: BackgroundSyncMode;
+  backgroundSyncIntervalMinutes: number;
   startupDelaySeconds: number;
   deleteMissingLocalFiles: boolean;
   deletionSafety: DeletionSafetySettings;
@@ -45,11 +46,12 @@ export interface SyncerSettings {
 }
 
 export const DEFAULT_SETTINGS: SyncerSettings = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   providerType: "yandex-disk",
   remoteRootPath: "/ObsidianVault",
   syncOnStartup: false,
   backgroundSyncMode: "all",
+  backgroundSyncIntervalMinutes: 0,
   startupDelaySeconds: 5,
   deleteMissingLocalFiles: true,
   deletionSafety: {

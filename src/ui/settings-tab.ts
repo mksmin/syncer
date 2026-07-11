@@ -134,7 +134,7 @@ export class SyncerSettingTab extends PluginSettingTab {
 
     new Setting(this.containerEl)
       .setName("Правило фоновой синхронизации")
-      .setDesc("Используется при запуске vault и командой «Синхронизировать сейчас».")
+      .setDesc("Используется при запуске vault, по таймеру и при ручном фоновом запуске.")
       .addDropdown((dropdown) => {
         dropdown
           .addOption("all", "Новые и изменённые")
@@ -145,6 +145,24 @@ export class SyncerSettingTab extends PluginSettingTab {
             if (value !== "all" && value !== "new" && value !== "updates") return;
             this.plugin.settings.backgroundSyncMode = value;
             await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(this.containerEl)
+      .setName("Синхронизация по таймеру")
+      .setDesc("Работает, пока Obsidian запущен. iOS может приостанавливать таймер в фоне.")
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption("0", "Выключена")
+          .addOption("5", "Каждые 5 минут")
+          .addOption("15", "Каждые 15 минут")
+          .addOption("30", "Каждые 30 минут")
+          .addOption("60", "Каждый час")
+          .setValue(String(this.plugin.settings.backgroundSyncIntervalMinutes))
+          .onChange(async (value) => {
+            this.plugin.settings.backgroundSyncIntervalMinutes = Number.parseInt(value, 10);
+            await this.plugin.saveSettings();
+            this.plugin.rescheduleBackgroundSync();
           });
       });
 
@@ -165,6 +183,35 @@ export class SyncerSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
+
+    new Setting(this.containerEl).setName("Ручной запуск").setHeading();
+    new Setting(this.containerEl)
+      .setName("Фоновая синхронизация")
+      .setDesc("Сразу применяет выбранное выше правило. Подтверждение не требуется.")
+      .addButton((button) =>
+        button
+          .setButtonText("Запустить")
+          .setDisabled(!this.plugin.isYandexAuthorized())
+          .onClick(() => this.plugin.startBackgroundSync()),
+      );
+
+    new Setting(this.containerEl)
+      .setName("Новый план синхронизации")
+      .setDesc("Заново читает Яндекс Диск и vault, затем ждёт вашего выбора.")
+      .addButton((button) =>
+        button
+          .setButtonText("Создать план")
+          .setCta()
+          .setDisabled(!this.plugin.isYandexAuthorized())
+          .onClick(() => this.plugin.openFreshSyncPlan()),
+      );
+
+    new Setting(this.containerEl)
+      .setName("Текущий статус")
+      .setDesc("Показывает активную синхронизацию или последний результат.")
+      .addButton((button) =>
+        button.setButtonText("Показать").onClick(() => this.plugin.openSyncStatus()),
+      );
 
     new Setting(this.containerEl)
       .setName("Удалять отсутствующие на сервере файлы")

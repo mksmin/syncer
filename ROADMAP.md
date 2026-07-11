@@ -41,11 +41,16 @@ Settings sections, auth UI, ribbon states, throttled progress/Notice, result/err
 dangerous confirmations, consistent Russian strings, mobile layout, checkboxes for selecting
 individual new/update files, incremental list expansion and selective sync.
 
-## v0.8.0 — iOS stabilization (current)
+## v0.8.0 — iOS stabilization (done)
 
 1,500+ planner stress, Cyrillic/special chars, binaries, interruption/background/weak network/mobile
 data, single-job mobile memory policy, progress throttling, iPhone/iPad/desktop matrix and enforced
 Node API bundle audit.
+
+## v0.9.0 — explicit sync flows (current)
+
+Separate background-now, fresh-plan and status actions; forced plan rebuild, startup and periodic
+background scheduling, single active session and settings-screen launch buttons.
 
 ## v1.0.0 — production Yandex mirror
 

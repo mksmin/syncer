@@ -17,7 +17,7 @@ describe("settings", () => {
       concurrentDownloads: 99,
       deletionSafety: { maxDeletePercentage: -2 },
     });
-    expect(settings.schemaVersion).toBe(5);
+    expect(settings.schemaVersion).toBe(6);
     expect(settings.concurrentDownloads).toBe(5);
     expect(settings.deletionSafety.maxDeletePercentage).toBe(0);
   });
@@ -25,6 +25,18 @@ describe("settings", () => {
   it("migrates a background sync rule", () => {
     expect(migrateSettings({ backgroundSyncMode: "updates" }).backgroundSyncMode).toBe("updates");
     expect(migrateSettings({ backgroundSyncMode: "invalid" }).backgroundSyncMode).toBe("all");
+  });
+
+  it("migrates and clamps a background sync interval", () => {
+    expect(
+      migrateSettings({ backgroundSyncIntervalMinutes: 15 }).backgroundSyncIntervalMinutes,
+    ).toBe(15);
+    expect(
+      migrateSettings({ backgroundSyncIntervalMinutes: -1 }).backgroundSyncIntervalMinutes,
+    ).toBe(0);
+    expect(
+      migrateSettings({ backgroundSyncIntervalMinutes: 10_000 }).backgroundSyncIntervalMinutes,
+    ).toBe(1_440);
   });
 
   it("adds the Codex metadata exclusion to existing settings", () => {

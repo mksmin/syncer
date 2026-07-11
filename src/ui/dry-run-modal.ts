@@ -13,6 +13,7 @@ const MAX_VISIBLE_OPERATIONS = 200;
 const PROGRESS_RENDER_INTERVAL_MS = 100;
 
 export interface DryRunActions {
+  rebuildPlan: () => void;
   syncAll: () => void;
   downloadNew: () => void;
   updateExisting: () => void;
@@ -281,6 +282,7 @@ export class DryRunModal extends Modal {
         text: "Выборочно: раскройте «Новые файлы» или «Изменённые файлы» и нажмите на нужные строки.",
       });
     }
+    actionButton(this.actionsEl, "Пересобрать план", this.actions.rebuildPlan, false);
     actionButton(
       this.actionsEl,
       `Синхронизировать выбранные файлы: ${String(this.selectedPaths.size)}`,

@@ -82,6 +82,12 @@ function pickKnownSettings(value: Record<string, unknown>): Partial<SyncerSettin
     result.logLevel = value.logLevel as SyncerSettings["logLevel"];
   }
   result.startupDelaySeconds = clampInteger(value.startupDelaySeconds, 0, 60, 5);
+  result.backgroundSyncIntervalMinutes = clampInteger(
+    value.backgroundSyncIntervalMinutes,
+    0,
+    1_440,
+    0,
+  );
   result.requestTimeoutMs = clampInteger(value.requestTimeoutMs, 1_000, 120_000, 30_000);
   result.retryCount = clampInteger(value.retryCount, 0, 10, 3);
   return result;

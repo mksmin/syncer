@@ -84,6 +84,7 @@ export default class SyncerPlugin extends Plugin {
   private lastSyncFinishedAt = 0;
   private activeModal: DryRunModal | undefined;
   private lastSessionModal: DryRunModal | undefined;
+  private backgroundIntervalId: number | undefined;
   readonly progress = new SyncProgressReporter();
 
   override async onload(): Promise<void> {
@@ -98,20 +99,20 @@ export default class SyncerPlugin extends Plugin {
     });
     this.addSettingTab(new SyncerSettingTab(this.app, this));
 
-    this.ribbonEl = this.addRibbonIcon("cloud-download", "Показать план синхронизации", () => {
-      void this.showDryRun();
+    this.ribbonEl = this.addRibbonIcon("cloud-download", "Создать новый план синхронизации", () => {
+      this.openFreshSyncPlan();
     });
     this.ribbonEl.addClass("syncer-ribbon");
 
     this.addCommand({
       id: "show-dry-run",
-      name: "Плановая синхронизация",
-      callback: () => void this.showDryRun(),
+      name: "Создать новый план синхронизации",
+      callback: () => this.openFreshSyncPlan(),
     });
     this.addCommand({
       id: "sync-now",
-      name: "Синхронизировать сейчас",
-      callback: () => void this.runBackgroundSync("manual"),
+      name: "Синхронизировать в фоне сейчас",
+      callback: () => this.startBackgroundSync(),
     });
     this.addCommand({
       id: "stop-sync",
@@ -124,8 +125,8 @@ export default class SyncerPlugin extends Plugin {
     });
     this.addCommand({
       id: "show-last-result",
-      name: "Показать последний результат",
-      callback: () => this.showLastPlan(),
+      name: "Показать статус синхронизации",
+      callback: () => this.openSyncStatus(),
     });
     this.addCommand({
       id: "check-connection",
@@ -135,12 +136,14 @@ export default class SyncerPlugin extends Plugin {
 
     this.app.workspace.onLayoutReady(() => {
       this.progress.report({ stage: "idle", current: 0, total: 0, message: "Ожидание" });
+      this.rescheduleBackgroundSync();
       if (!this.settings.syncOnStartup) return;
       const timeoutId = window.setTimeout(() => {
         void this.runBackgroundSync("startup");
       }, this.settings.startupDelaySeconds * 1_000);
       this.register(() => window.clearTimeout(timeoutId));
     });
+    this.register(() => this.clearBackgroundInterval());
   }
 
   override onunload(): void {
@@ -153,6 +156,32 @@ export default class SyncerPlugin extends Plugin {
       () => this.savePluginData(),
     );
     await this.snapshotSaveChain;
+  }
+
+  startBackgroundSync(): void {
+    void this.runBackgroundSync("manual");
+  }
+
+  openFreshSyncPlan(): void {
+    if (this.planning) {
+      this.reopenActiveOperation();
+      return;
+    }
+    this.remoteIndexCache = undefined;
+    void this.showDryRun();
+  }
+
+  openSyncStatus(): void {
+    this.showLastPlan();
+  }
+
+  rescheduleBackgroundSync(): void {
+    this.clearBackgroundInterval();
+    const minutes = this.settings.backgroundSyncIntervalMinutes;
+    if (minutes <= 0) return;
+    this.backgroundIntervalId = window.setInterval(() => {
+      void this.runBackgroundSync("timer");
+    }, minutes * 60_000);
   }
 
   isYandexAuthorized(): boolean {
@@ -272,6 +301,7 @@ export default class SyncerPlugin extends Plugin {
       });
       modal.updatePlan(this.lastPlan, true);
       this.setPlanActions(modal, this.lastPlan, remoteRoot);
+      this.lastSessionModal = modal;
     } catch (error: unknown) {
       if (controller.signal.aborted) return;
       this.logger.error("Dry run failed", { error });
@@ -296,9 +326,9 @@ export default class SyncerPlugin extends Plugin {
     }
   }
 
-  private async runBackgroundSync(source: "manual" | "startup"): Promise<void> {
+  private async runBackgroundSync(source: "manual" | "startup" | "timer"): Promise<void> {
     if (this.planning) {
-      this.reopenActiveOperation();
+      if (source === "manual") this.reopenActiveOperation();
       return;
     }
     const modal = new DryRunModal(this.app);
@@ -592,6 +622,10 @@ export default class SyncerPlugin extends Plugin {
 
   private setPlanActions(modal: DryRunModal, plan: SyncPlan, remoteRoot: string): void {
     modal.setActions({
+      rebuildPlan: () => {
+        modal.close();
+        this.openFreshSyncPlan();
+      },
       syncAll: () => this.confirmPlanExecution(plan, "all", modal, remoteRoot),
       downloadNew: () => this.confirmPlanExecution(plan, "new", modal, remoteRoot),
       updateExisting: () => this.confirmPlanExecution(plan, "updates", modal, remoteRoot),
@@ -705,6 +739,12 @@ export default class SyncerPlugin extends Plugin {
       return;
     }
     this.activeModal.open();
+  }
+
+  private clearBackgroundInterval(): void {
+    if (this.backgroundIntervalId === undefined) return;
+    window.clearInterval(this.backgroundIntervalId);
+    this.backgroundIntervalId = undefined;
   }
 
   private async listRemoteFiles(
